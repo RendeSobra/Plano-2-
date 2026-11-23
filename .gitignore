@@ -1,0 +1,12 @@
+# Chaves secretas: nunca vão para o Git
+.env
+
+# Banco de dados (dados pessoais das pessoas que usam o bot)
+rende.db
+*.db-journal
+
+# Ambiente virtual do Python e arquivos gerados
+.venv/
+__pycache__/
+*.pyc
+*.log

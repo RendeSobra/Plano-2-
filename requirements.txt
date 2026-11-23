@@ -1,0 +1,5 @@
+python-telegram-bot[job-queue]>=22.8,<23
+google-genai>=3.6,<4
+anthropic>=2.12,<3
+fpdf2>=2.9,<3
+python-dotenv>=1.2,<2
