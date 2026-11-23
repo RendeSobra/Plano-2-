@@ -2,8 +2,10 @@
 .env
 
 # Banco de dados (dados pessoais das pessoas que usam o bot)
-rende.db
+*.db
 *.db-journal
+*.db-wal
+*.db-shm
 
 # Ambiente virtual do Python e arquivos gerados
 .venv/
