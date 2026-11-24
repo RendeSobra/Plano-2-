@@ -567,6 +567,16 @@ plano_ag = asyncio.run(cardapio.gerar_plano("u9"))
 ok(len(plano_ag["refeicoes"]) == 9 and modelos(claude) == [SONNET] and plano_ag["cesta"]["total"] > 0
    and plano_ag["receitas"] == {},
    "plano com café agrupado é aceito pelo Sonnet de primeira, sem receitas prontas (geradas ao abrir)")
+ok("por refeição" in claude.chamadas[0]["mensagens"][0]["texto"]
+   and f"R$ {200 / 9:.2f} por refeição" in claude.chamadas[0]["mensagens"][0]["texto"],
+   "o pedido diz quanto dá, em média, por refeição (R$ 200 / 9 refeições)")
+g, _ = cardapio.conferir(plano_valido(), banco.usuario("u1") or criar_usuario(), calc, 100)
+estouro = next(x for x in g if "orçamento" in x)
+ok("Itens que mais pesam: carne moída R$ 32.00" in estouro
+   and "arroz (usa 500 g, compra 1 pacote 5 kg por R$ 24.90)" in estouro,
+   "orçamento estourado: a correção diz os itens que mais pesam e as embalagens grandes demais para o uso")
+ok(roteador.categoria([estouro]) == "orçamento" and roteador.categoria([estouro, "tem queijo (Lactose)"]) == "alergia/restrição",
+   "nome de item na dica ('ovo') não faz o estouro de orçamento virar 'alergia' no registro")
 
 # =======================================================================================
 secao("Cadastro com botões")

@@ -253,8 +253,29 @@ def conferir(plano: dict, perfil: dict, calc: dict, orcamento: float,
 
     if orcamento and calc["total"] > orcamento + 0.009:
         graves.append(f"passou R$ {calc['total'] - orcamento:.2f} do orçamento: o total das embalagens deu "
-                      f"R$ {calc['total']:.2f}, acima do orçamento de R$ {orcamento:.2f}")
+                      f"R$ {calc['total']:.2f}, acima do orçamento de R$ {orcamento:.2f}"
+                      + _dicas_orcamento(plano, calc))
     return graves, avisos
+
+
+def _dicas_orcamento(plano: dict, calc: dict) -> str:
+    """Diz a quem refaz o plano ONDE cortar: os itens que mais pesam e as embalagens grandes demais
+    para o uso (no teste real de 24/11: açúcar 5 kg para usar 270 g, café 500 g para usar 175 g)."""
+    tamanhos = {cesta.chave(p["item"]): float(p.get("tamanho") or 0) for p in plano.get("produtos", [])}
+    caros = sorted((l for l in calc["linhas"] if l["custo"] > 0), key=lambda l: -l["custo"])[:5]
+    grandes = []
+    for l in calc["linhas"]:
+        comprado = l["pacotes"] * tamanhos.get(cesta.chave(l["item"]), 0)
+        usa = l["precisa"] - l["da_despensa"]
+        if comprado > 0 and l["custo"] >= 5 and usa / comprado < 0.4:
+            grandes.append(f"{l['item']} (usa {usa:g} {l['unidade']}, compra {cesta.texto_embalagem(l)} "
+                           f"por R$ {l['custo']:.2f})")
+    dicas = ""
+    if caros:
+        dicas += ". Itens que mais pesam: " + "; ".join(f"{l['item']} R$ {l['custo']:.2f}" for l in caros)
+    if grandes:
+        dicas += ". Embalagens grandes demais para o uso (troque por uma menor): " + "; ".join(grandes)
+    return dicas
 
 
 # --- geração do plano -------------------------------------------------------------
@@ -279,7 +300,9 @@ def _briefing_plano(usuario: str, perfil: dict, despensa: dict, promos: list[dic
     linhas = _linhas_perfil(perfil)
     linhas.append(f"Planeje EXATAMENTE estas {len(slots)} refeições: "
                   + "; ".join(f"{NOME_DIA[d]} ({d}) {NOME_REFEICAO[t]} ({t})" for d, t in slots) + ".")
-    linhas.append(f"Orçamento da semana: R$ {orcamento_semanal(perfil):.2f} (o total das embalagens precisa caber).")
+    orcamento = orcamento_semanal(perfil)
+    linhas.append(f"Orçamento da semana: R$ {orcamento:.2f} (o total das embalagens precisa caber; "
+                  f"em média R$ {orcamento / max(1, len(slots)):.2f} por refeição para a família toda).")
     if despensa:
         def _qtd(v: dict) -> str:
             if v.get("unidade") == "?":

@@ -120,16 +120,20 @@ def escada(tarefa: str, *, complexo: bool = False, tem_audio: bool = False) -> l
 
 def categoria(problemas: list[str]) -> str:
     """Resumo do motivo de uma reprovação, para o log e o /custos."""
-    texto = " ".join(problemas).lower()
+    # O problema de orçamento traz nomes de itens ("ovo R$ 40,00") como dica: as outras
+    # regras olham só os demais problemas, para "ovo" ali não virar "alergia".
+    orcamento = any("orçamento" in p.lower() for p in problemas)
+    texto = " ".join(p for p in problemas if "orçamento" not in p.lower()).lower()
     regras = [("alergia/restrição", ("lactose", "glúten", "ovo", "amendoim", "frutos do mar", "peixe", "soja",
                                      "vegetariano", "(outro)")),
-              ("orçamento", ("orçamento",)),
+              ("orçamento", ()),
               ("repetição", ("mais de uma vez", "rejeitado", "igual ao antigo", "semana passada")),
               ("utensílios", ("não tem",)),
               ("JSON inválido", ("json",)),
-              ("estrutura", ("faltam", "sem ingredientes", "embalagem", "unidade", "não foram pedidas"))]
+              ("estrutura", ("faltam", "sem ingredientes", "embalagem", "unidade", "não foram pedidas",
+                             "quantidade"))]
     for nome, palavras in regras:
-        if any(p in texto for p in palavras):
+        if (nome == "orçamento" and orcamento) or any(p in texto for p in palavras):
             return nome
     return "outros"
 

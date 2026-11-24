@@ -19,9 +19,13 @@ orçamento, troca de pratos, receita passo a passo com nota, PDF da lista, conve
 por texto, áudio e foto, e uma escada de modelos de IA que sobe de nível só quando precisa.
 
 - Bot: `@cesta_cardapio_bot`. Nasceu como "Cesta" e foi renomeado para "Rende" pela API.
-- Pasta local: `C:\Users\mathe\Plano-2-` desde 24/11 (ambiente virtual em `.venv`, Python 3.12).
-  O banco `rende.db` não vem pelo Git: aqui ele começou vazio, e o perfil e os custos do teste
-  de 23/11 ficaram no computador antigo.
+- Pastas locais (o dono usa dois computadores; **sempre `git fetch` antes de começar**):
+  - `C:\Users\Matheus Duarte\cesta-bot`: o computador onde tudo começou (23/11). O `rende.db`
+    daqui tem o perfil e os custos do teste de 23/11. Desde a tarde de 24/11 (Pedido I) é
+    neste que o trabalho e os testes reais acontecem; o bot do outro fica desligado.
+  - `C:\Users\mathe\Plano-2-`: usado na manhã de 24/11 (Pedido H, PARTE A). O `rende.db`
+    de lá começou vazio.
+  - O `rende.db` nunca vai pelo Git. Só uma cópia do bot pode estar ligada por vez.
 - Por enquanto roda **só no computador local** (polling). Desligou o computador, o bot para.
 
 ## 2. Linha do tempo
@@ -66,6 +70,13 @@ por texto, áudio e foto, e uma escada de modelos de IA que sobe de nível só q
    3 chaves.** Detalhes na seção "Segurança" do PLANO.md.
 9. **Teste real no celular (parcial) e 3 correções:** robô ligado neste computador, cadastro
    novo com orçamento de R$ 140. Resultado e correções na seção 6 e 7.
+10. **Pedido I (tarde de 24/11, no computador `cesta-bot`):** a cópia antiga foi alinhada com
+    o GitHub e o commit com o `.env` sumiu também do registro local; anthropic 2.13. O dono
+    mandou executar todos os pendentes do H sem parar entre as etapas, com decisões novas
+    (PLANO.md, "Decisões do Pedido I"). Primeira etapa, **custo do cardápio**: JSON compacto
+    sem modo de preparo e Sonnet com effort "low". Rodada real: US$ 0,053 (antes US$ 0,131
+    só no Sonnet), mas o plano estourou o orçamento por escolher embalagens grandes demais;
+    regras corrigidas, nova medição pendente (tabela "Custo do cardápio" no PLANO.md).
 
 ## 3. Arquitetura (cada arquivo com um papel)
 
@@ -111,7 +122,7 @@ Tabelas: `usuarios`, `historico` (30 últimas), `planos` (3 últimos; o mais nov
 ## 5. Como rodar e testar
 
 Veja o [README](README.md). Testes automáticos: `.venv\Scripts\python testes\testar.py`
-(**109 de 109 OK** em 24/11/2026). Ajudantes do teste pelo celular em `testes/celular/`.
+(**124 de 124 OK** em 24/11/2026). Ajudantes do teste pelo celular em `testes/celular/`.
 
 ## 6. Resultado do teste real no celular (23/11/2026)
 

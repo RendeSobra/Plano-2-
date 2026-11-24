@@ -128,9 +128,12 @@ planejada do jantar.
 6. Use primeiro o que já está na despensa (o item entra em "compras" do mesmo jeito: o \
 sistema desconta o que a pessoa já tem). Use promoções quando fizer sentido, com o \
 preço exato da promoção para aquela embalagem.
-7. Orçamento: o sistema soma as embalagens em código, então não precisa fazer a conta \
-exata. Mire entre 85% e 95% do orçamento da semana. Se apertar, prefira proteínas mais \
-baratas (ovo, frango, carne moída), mais feijão e legumes da época.
+7. Orçamento: o total das embalagens precisa caber no orçamento da semana; mire entre \
+85% e 95% dele. Pense por refeição: o pedido diz quanto dá, em média, por refeição. \
+Compre a MENOR embalagem que cubra o que a semana usa (açúcar 1 kg se a semana usa \
+300 g; café 250 g se usa menos que isso; uma dúzia de ovos a mais em vez de outra \
+bandeja de 30). Se apertar, prefira proteínas mais baratas (ovo, frango, carne moída), \
+mais feijão e legumes da época.
 8. A vibe da pessoa manda no estilo (rápido, uma panela só, cozinhar no domingo, comida \
 de vó, leve, fitness com mais proteína).
 """

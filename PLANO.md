@@ -7,9 +7,11 @@ Bot: @cesta_cardapio_bot (nome de exibição passa de "Cesta" para "Rende").
 
 Última atualização: 24/11/2026. A especificação em vigor é o **Pedido H**
 ([docs/PEDIDOS.md](docs/PEDIDOS.md)); onde ela discordar dos pedidos anteriores, vale ela.
+O **Pedido I** (mesmo arquivo) manda executar os itens pendentes do H numa ordem própria,
+com decisões do dono que valem por cima do H (ver "Decisões do Pedido I").
 Histórico, testes reais e detalhes: [CONTEXTO.md](CONTEXTO.md).
 
-Testes automáticos: `.venv\Scripts\python testes\testar.py` (**109 de 109 OK em 24/11/2026**).
+Testes automáticos: `.venv\Scripts\python testes\testar.py` (**124 de 124 OK em 24/11/2026**).
 
 ## Pedidos e situação
 
@@ -23,14 +25,15 @@ Testes automáticos: `.venv\Scripts\python testes\testar.py` (**109 de 109 OK em
 | E | Experiência com botões: cadastro, "montando seu plano", cardápio por dia, troca, receita passo a passo, nota | ✅ Feito e testado no celular (23/11) |
 | F | Escada de modelos: Gemini → Haiku → Sonnet → Opus, limites por modelo, cache, /custos | ✅ Feito e testado no celular (23/11) |
 | G | Mensagens de troca e PDF sem poluir o chat; contexto no GitHub | ✅ Feito |
-| H | Retomada com a especificação completa (PARTES A a F) | 🔧 PARTE A ✅ (24/11). Próximo: C1, C4–C11 |
+| H | Retomada com a especificação completa (PARTES A a F) | 🔧 PARTE A ✅ (24/11). Itens pendentes: ver Pedido I |
+| I | Executar os pendentes do H sem parar entre etapas + Modo mercado + PDF com caixinhas | 🔧 Custo do cardápio ✅ (24/11). Próximo: C10 |
 
 ## Pedido H: situação de cada item da PARTE C (conferido em 24/11/2026)
 
 | Item | Situação | O que falta |
 |---|---|---|
 | C1 Arquitetura | 🟡 | Só a pasta `coletor/` (vem no C13) |
-| C2 Escada de modelos | 🟢 quase | `/custos` mostra os escalonamentos só do dia (pedido: dia e mês). O Haiku usa effort "medium" na troca: conferir na documentação atual se é o certo. Feito em 24/11 (depois do teste real): limite de 32 mil tokens com streaming; a troca recebe a folga exata e as sobras das embalagens; conferir no próximo teste se ela passa de primeira |
+| C2 Escada de modelos | 🟢 quase | `/custos` mostra os escalonamentos só do dia (pedido: dia e mês). O Haiku usa effort "medium" na troca: conferir na documentação atual se é o certo. Feito em 24/11 (depois do teste real): limite de 32 mil tokens com streaming; a troca recebe a folga exata e as sobras das embalagens; conferir no próximo teste se ela passa de primeira. **Cardápio compacto e Sonnet em effort "low" (Pedido I, 24/11): ver "Custo do cardápio"** |
 | C3 Escopo | ❌ | Hoje é só uma frase no prompt. Falta o campo `no_escopo` conferido em código, as mensagens fixas com botões, o log "fora_do_escopo" e o teste com 40 mensagens |
 | C4 Personalidade | ✅ | O resumo semanal depende do C14 |
 | C5 Memória | ✅ | Funciona com nomes diferentes do pedido: despensa é uma coluna de `usuarios` e os custos ficam em `uso_ia`. `/perfil` não edita cidade nem localização |
@@ -45,19 +48,61 @@ Testes automáticos: `.venv\Scripts\python testes\testar.py` (**109 de 109 OK em
 | C14 Promoções e avisos | ❌ quase tudo | Existem a tabela `promocoes` e o liga/desliga pela conversa. Faltam `/promo`, `/avisos`, avisos pelo JobQueue, resumo semanal e limpeza das vencidas |
 | C15 "Onde comprar" | ❌ | Não começado |
 
-## Ordem de trabalho (PARTE D do Pedido H)
+## Ordem de trabalho (Pedido I, 24/11; substitui a PARTE D do Pedido H)
 
-1. ✅ PARTE A: ler tudo, segurança, resumo (24/11).
-2. ⏳ **Próximo:** conferir e completar C1, C4, C5, C6, C7, C8, C9, C10 e C11
-   (começando pelas lacunas de alergia do C10 e pelo "≈ estimado" do PDF).
-3. C2 (escada de modelos).
-4. C3 (escopo).
-5. C13 Fase 1 (pesquisa das redes) → **parar e esperar aprovação**.
-6. C13 Fase 2 + C14.
-7. C15.
-8. C12.
-9. Testes no celular (PARTE E) → **avisar o custo estimado antes**.
-10. Relatório final (PARTE F) e PLANO.md atualizado.
+Sem parar entre os itens; resumo curto ao fim de cada C.
+
+1. ✅ PARTE A do H: ler tudo, segurança, resumo (24/11).
+2. ✅ **Custo do cardápio** (24/11): JSON compacto sem modo de preparo; medição antes/depois.
+3. ⏳ **Próximo: C10** (conferências), incluindo a lacuna 3 (plano acima do orçamento).
+4. C9, C11 e **Modo mercado** (marcar o que já foi comprado; PDF com caixinhas clicáveis).
+5. C6 (entender qualquer mensagem).
+6. C2 (escada de modelos).
+7. C3 (escopo).
+8. C13 Fases 1 e 2 (o Claude escolhe as redes pelos critérios do dono; não para).
+9. C14 → C15 → C12.
+10. Relatório final (PARTE F) e roteiro do teste no celular (o dono testa depois de trocar as chaves).
+
+## Custo do cardápio (Pedido I, 24/11/2026)
+
+Medido com o mesmo perfil do teste de 23/11 (2 adultos + 1 criança, 21 refeições, sem lactose,
+R$ 300). Script: `.venv\Scripts\python testes\medir_cardapio.py` (estimativa grátis) e
+`... --real` (uma chamada paga ao Sonnet, limitada a US$ 0,15).
+
+| | Antes (testes reais) | Depois: estimativa | Depois: rodada real |
+|---|---|---|---|
+| JSON do cardápio | ~7.400 tokens | ~4.700 (−37%) | ~4.500 |
+| Raciocínio (saída) | ~5.000 (effort medium) | 1.500–2.500 (low, suposição) | ~0 (low) |
+| Custo do Sonnet | US$ 0,131 (23/11) | US$ 0,068–0,078 | **US$ 0,053** |
+| Com o Opus refazendo | US$ 0,33 (23/11) e US$ 0,36 (24/11) | — | — |
+| Passou na conferência? | não (23/11: falso alarme de alergia; 24/11: cortado) | — | **não: R$ 351,50 de R$ 300** |
+
+O que mudou: formato compacto (chaves curtas, café repetido numa entrada com vários dias,
+ingrediente sem unidade, perecível deduzido da seção, sem "nome" e sem "reaproveitamento");
+o modo de preparo continua sendo gerado só ao abrir o prato (Gemini → Haiku) e guardado;
+Sonnet com effort "low" (`ESFORCO_CARDAPIO`); o Opus refaz com "medium".
+
+O que a rodada real mostrou: a meta de custo foi batida, mas sem raciocínio o Sonnet escolheu
+embalagens grandes demais para o uso (açúcar 5 kg para 270 g, café 500 g para 175 g, 2
+bandejas de ovos) e estourou o orçamento; na escada, o Opus refaria (~US$ 0,19). Correções
+feitas logo depois, ainda **sem nova medição real**: regra "menor embalagem que cubra o uso",
+valor médio por refeição no pedido e, quando estoura, a correção diz quais itens pesam mais e
+quais embalagens estão grandes demais. **Pendente:** uma nova rodada real (~US$ 0,05) para ver se
+o Sonnet passa de primeira; se não passar, as opções são effort "medium" (~US$ 0,10) ou deixar o
+próprio Sonnet corrigir o orçamento antes de chamar o Opus (decisão do dono).
+
+## Decisões do Pedido I (24/11/2026)
+
+- Executar os pendentes do H **sem esperar aprovação entre as etapas**; resumo curto ao fim de cada C.
+- **Push bloqueado** até o dono confirmar a troca das 3 chaves. Chamadas pagas ao Claude nos
+  testes reais: permitidas, avisando o custo estimado antes de cada rodada.
+- Lacuna 3 do C10: sem nenhum modelo dentro do orçamento, entregar o melhor plano avisando quanto
+  passou, com os botões [Tirar lanches] [Aumentar para R$ X] [Pratos mais simples]; avisar já no
+  cadastro se o orçamento estiver muito abaixo do sugerido.
+- Cardápio em JSON compacto sem modo de preparo; meta de custo: Sonnet sozinho abaixo de US$ 0,08.
+- C13: o Claude escolhe as redes (loja em Goiânia hoje, ofertas sem login, robots.txt e termos
+  permitem) e já faz a Fase 2 para até 5; as outras ficam como "candidatas a parceria".
+- Novo: 🛒 Modo mercado e PDF com caixinhas clicáveis (texto completo no Pedido I).
 
 ## Regras de trabalho (PARTE B)
 
@@ -102,7 +147,11 @@ Testes automáticos: `.venv\Scripts\python testes\testar.py` (**109 de 109 OK em
   Anthropic Console) e colar as novas só no `.env` local. O GitHub ainda guarda o commit antigo
   por um tempo, acessível só por quem tem o código dele; a troca das chaves resolve de vez.
   Para apagar também essa cópia, é preciso pedir ao suporte do GitHub (opcional).
-- Depois da troca: apagar a cópia de segurança local feita antes da limpeza (tem as chaves antigas).
+- Depois da troca: apagar a cópia de segurança local feita antes da limpeza (tem as chaves antigas;
+  fica no outro computador).
+- No computador `C:\Users\Matheus Duarte\cesta-bot` (24/11): a cópia antiga, que ainda tinha o
+  commit com o `.env`, foi alinhada com o GitHub (`reset --hard origin/main`, guardando o `.env`)
+  e o commit antigo foi apagado também do registro local (`reflog expire` + `gc --prune=now`).
 
 ## Chaves no .env (o dono preenche; nunca vão para a conversa nem para o Git)
 

@@ -1,6 +1,6 @@
 # Pedidos (texto original, em ordem)
 
-Pedidos 0 a G: feitos em 23/11/2026. Pedido H (24/11/2026): em andamento. Situação de cada um: [PLANO.md](../PLANO.md) e [CONTEXTO.md](../CONTEXTO.md).
+Pedidos 0 a G: feitos em 23/11/2026. Pedido H (24/11/2026): especificação em vigor. Pedido I (24/11/2026): execução dos itens pendentes do H, em andamento. Situação de cada um: [PLANO.md](../PLANO.md) e [CONTEXTO.md](../CONTEXTO.md).
 
 ---
 
@@ -652,3 +652,64 @@ No celular (me avise o custo antes):
 - Custo médio por cardápio e % de escalonamento para o Opus.
 - Próximos passos recomendados (servidor 24h no Railway ou Render, Supabase, WhatsApp, política de privacidade).
 - PLANO.md atualizado.
+
+---
+
+## Pedido I: executar os itens pendentes do Pedido H + Modo mercado (24/11/2026)
+
+Texto original colado na conversa (no computador `C:\Users\Matheus Duarte\cesta-bot`).
+Ajustes que vieram nas mensagens seguintes estão logo depois do texto.
+
+Decisão: execute AGORA todos os itens pendentes do PLANO.md (C2, C3, C6, C9, C10, C11, C12, C13, C14 e C15), sem esperar minha aprovação entre as etapas. Continue seguindo as regras da PARTE B (testes, PLANO.md e commits a cada etapa), e me mande um resumo curto ao final de cada C.
+
+#### Restrições enquanto eu não troco as chaves
+
+- As 3 chaves (Telegram, Gemini, Anthropic) vazaram e ainda não foram trocadas. Até eu avisar que troquei:
+  - não faça chamadas PAGAS ao Claude; use modelos simulados nos testes;
+  - não faça push para o GitHub;
+  - não apague a cópia de segurança.
+- A pesquisa na internet (C13 Fase 1) pode ser feita normalmente.
+
+#### Decisões que já tomei
+
+1. Lacuna 3 do C10: quando nenhum modelo acerta o orçamento, ENTREGAR o melhor plano, avisando quanto passou e oferecendo opções com botões: [Tirar lanches] [Aumentar para R$ X] [Pratos mais simples]. Se o orçamento escolhido estiver muito abaixo do sugerido no cadastro, avisar já no cadastro.
+2. Custo do cardápio (fazer ANTES do resto do C10):
+   - ao gerar o cardápio, o modelo devolve só JSON compacto: pratos, ingredientes com quantidades e lista de compras, SEM modo de preparo;
+   - o modo de preparo é gerado só quando o usuário toca em [📖 Receita], pelo modelo mais barato que der conta (Gemini ou Haiku), e fica salvo;
+   - meça tokens e custo antes e depois com o mesmo perfil (simulado ou estimado). Meta: Sonnet sozinho, menos de US$ 0,08 por cardápio.
+3. C13 Fase 1: faça a pesquisa das redes de Goiânia e ESCOLHA VOCÊ as redes, seguindo estes critérios:
+   - tem loja em Goiânia hoje;
+   - ofertas acessíveis sem login;
+   - robots.txt e termos de uso não proíbem a coleta.
+   Implemente a Fase 2 para até 5 redes que passarem. As que não passarem ficam documentadas no PLANO.md como "candidatas a parceria". Me mostre a tabela no resumo.
+
+#### Nova funcionalidade: marcar o que já foi comprado
+
+1. "🛒 Modo mercado" no Telegram:
+   - botão [🛒 Modo mercado] no resultado e na lista;
+   - mostra a lista por seção do mercado; cada item é um botão; tocar alterna entre ⬜ e ✅ (editando a mesma mensagem, sem mandar várias);
+   - no topo: "✅ 12 de 34 itens · R$ 145 de R$ 287";
+   - botão [✏️ Paguei outro preço]: o usuário informa o preço real do item, que alimenta a tabela de preços (origem "usuario");
+   - botão [🏁 Terminei as compras]: o que foi comprado vai para a despensa; o que faltou fica numa lista "não encontrei" e o Rende oferece substitutos;
+   - o progresso fica salvo no banco: se fechar e abrir de novo, continua de onde parou.
+2. PDF com caixinhas clicáveis:
+   - use campos de formulário (checkbox AcroForm) em cada item, que funcionam em leitores como Adobe Acrobat e Google Drive;
+   - mantenha as caixinhas visíveis também na impressão;
+   - no fim do PDF, uma nota: "Dica: no Telegram, use 🛒 Modo mercado para marcar direto no app";
+   - se a fpdf2 não suportar checkbox de formulário, use outra biblioteca (pypdf ou reportlab) só para essa parte e explique a escolha.
+3. Testes automáticos: marcar e desmarcar, total parcial, salvar o progresso, "terminei" movendo para a despensa, preço informado pelo usuário e PDF com os campos de checkbox.
+
+#### Ordem
+
+Custo do cardápio → C10 (incluindo a lacuna 3) → C9, C11 e Modo mercado → C6 → C2 → C3 → C13 (Fase 1 e Fase 2) → C14 → C15 → C12.
+Ao final: relatório completo (PARTE F) e o roteiro do teste no celular, que eu faço depois de trocar as chaves.
+
+#### Ajustes nas mensagens seguintes (24/11)
+
+- A cópia de segurança ficou no outro computador; não precisa procurar.
+- As chaves só serão trocadas depois dos testes: **pode** fazer chamadas pagas ao Claude nos testes reais, avisando o custo estimado antes de cada rodada. **Push continua bloqueado** até o dono confirmar a troca.
+- Esta cópia antiga foi alinhada com o GitHub (`reset --hard origin/main`) e o commit antigo com o `.env` foi apagado também do reflog local.
+- Biblioteca anthropic 2.13 nos dois computadores; `.env` com `APAGAR_PDF_APOS_MIN` e `COTACAO_DOLAR`.
+- Medição do custo: o "antes" é o teste real (US$ 0,36 com o Opus refazendo); o "depois" é estimado de graça e confirmado com UMA rodada real só no Sonnet, se custar até US$ 0,15.
+- O bot do outro computador fica desligado; os testes reais são feitos neste.
+- Sem parar entre os itens: só um resumo curto ao final de cada C.
