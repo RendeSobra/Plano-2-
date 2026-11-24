@@ -65,9 +65,11 @@ DEFINICOES = [
     {"nome": "mostrar",
      "descricao": "Mostra o resumo do plano, o cardápio (de um dia), a lista de compras, o PDF da lista, o "
                   "Modo mercado (marcar o que já foi para o carrinho, durante as compras) ou onde comprar "
-                  "(quanto a lista sai em cada mercado).",
+                  "(quanto a lista sai em cada mercado). mercados_proximos: supermercados perto da pessoa (pede a "
+                  "localização se ela ainda não mandou).",
      "parametros": {"type": "object", "required": ["o_que"], "properties": {
-         "o_que": {"type": "string", "enum": ["resumo", "cardapio", "lista", "pdf", "mercado", "onde_comprar"]},
+         "o_que": {"type": "string", "enum": ["resumo", "cardapio", "lista", "pdf", "mercado", "onde_comprar",
+                                                "mercados_proximos"]},
          "dia": {"type": "string", "enum": _DIAS}}}},
     {"nome": "avaliar_prato",
      "descricao": "Guarda a nota (1 a 5) que a pessoa deu para um prato. 4-5 = favorito, 1-2 = não usar mais.",
@@ -173,6 +175,9 @@ def _trocar_prato(ctx: Contexto, dia: str, refeicao: str, pedido: str = "") -> d
 
 
 def _mostrar(ctx: Contexto, o_que: str, dia: str | None = None) -> dict:
+    if o_que == "mercados_proximos":  # não precisa de plano
+        ctx.saidas.append(Saida(tipo="acao", acao="lc:ver"))
+        return {"ok": True}
     if not banco.plano_atual(ctx.usuario):
         return {"erro": "a pessoa ainda não tem plano; ofereça montar um"}
     acao = {"resumo": "pl:res", "lista": "pl:lista", "pdf": "pl:pdf", "mercado": "mm:ver", "onde_comprar": "oc:ver",

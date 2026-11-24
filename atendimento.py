@@ -19,6 +19,7 @@ import cardapio
 import escopo
 import ferramentas
 import mercado
+import mercados_proximos
 import onde_comprar
 import pdf
 import promocoes
@@ -136,6 +137,10 @@ async def acao(usuario: str, acao_txt: str) -> list[Saida]:
         return _acao_mercado(usuario, acao_txt)
     if acao_txt.startswith("oc:"):
         return await _acao_onde_comprar(usuario, acao_txt)
+    if acao_txt == "lc:pedir":
+        return [telas.pedir_localizacao()]
+    if acao_txt == "lc:ver":
+        return await _mercados_perto(usuario)
     if acao_txt.startswith("av:"):
         return [avisos.acao(usuario, acao_txt)]
     if acao_txt == "pr:ver":
@@ -188,7 +193,32 @@ def _acao_mercado(usuario: str, acao_txt: str) -> list[Saida]:
 
 async def distancias_dos_mercados(perfil: dict) -> dict[str, float]:
     """Rede -> distância (km) da loja mais perto, quando a pessoa mandou a localização (C12)."""
-    return {}
+    if perfil.get("latitude") is None or perfil.get("longitude") is None:
+        return {}
+    try:
+        return mercados_proximos.distancias_por_rede(
+            await mercados_proximos.buscar(perfil["latitude"], perfil["longitude"]))
+    except mercados_proximos.ErroMapa as erro:
+        log.warning("Onde comprar sem distâncias: %s", erro)
+        return {}
+
+
+async def _mercados_perto(usuario: str) -> list[Saida]:
+    """C12: até 8 supermercados no raio, destacando as redes com promoção na cidade da pessoa."""
+    perfil = banco.usuario(usuario)
+    if perfil.get("latitude") is None or perfil.get("longitude") is None:
+        return [telas.pedir_localizacao()]
+    try:
+        achados = await mercados_proximos.buscar(perfil["latitude"], perfil["longitude"])
+    except mercados_proximos.ErroMapa as erro:
+        log.warning("Mercados próximos: %s", erro)
+        return [telas.tela("O serviço de mapas está ocupado agora 😕 Tenta de novo daqui a pouco?",
+                           [[Botao("🔄 Tentar de novo", "lc:ver")]])]
+    cidade = perfil.get("cidade") or promocoes.CIDADE_PADRAO
+    com_promo = {restricoes.normalizar(p["mercado"]) for p in banco.promocoes_validas(cidade=cidade, limite=5000)}
+    log.info("Mercados próximos: %d encontrados.", len(achados))
+    return [telas.mercados_proximos(achados, com_promo, mercados_proximos.raio_m(),
+                                    banco.plano_atual(usuario) is not None)]
 
 
 async def _acao_onde_comprar(usuario: str, acao_txt: str) -> list[Saida]:
@@ -503,7 +533,8 @@ async def receber_localizacao(usuario: str, latitude: float, longitude: float) -
     banco.contar_mensagem(usuario)
     banco.atualizar_perfil(usuario, latitude=latitude, longitude=longitude,
                            localizacao_em=banco.agora().isoformat(timespec="seconds"))
-    return [telas.texto("📍 Guardei sua localização! Em breve vou mostrar os mercados perto de você.")]
+    guardada = telas.texto("📍 Guardei sua localização! Procurando os mercados perto de você...")
+    return [guardada] + await _mercados_perto(usuario)
 
 
 # --- administração --------------------------------------------------------------------

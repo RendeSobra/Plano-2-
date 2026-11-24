@@ -108,6 +108,7 @@ por texto, áudio e foto, e uma escada de modelos de IA que sobe de nível só q
 | `coletor/` | C13: um arquivo por rede (Prezunic, Atacadão, Dia a Dia), `web.py` (robots.txt, 5 s por site), `extrair.py` (Gemini). `python -m coletor` |
 | `avisos.py` | C14: quem recebe aviso de promoção e resumo semanal (o canal só entrega), `/avisos` |
 | `onde_comprar.py` | C15: total da lista por mercado, divisão entre 2 mercados, condições |
+| `mercados_proximos.py` | C12: supermercados perto (Overpass/OpenStreetMap), distância, link do Google Maps |
 
 Tabelas: `usuarios`, `historico` (30 últimas), `planos` (3 últimos; o mais novo é o atual; o
 progresso do Modo mercado e a escolha do "Onde comprar" ficam dentro dele), `promocoes`, `precos`

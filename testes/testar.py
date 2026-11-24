@@ -1142,6 +1142,10 @@ import casos_onde_comprar  # noqa: E402
 
 casos_onde_comprar.rodar(ok, secao, novo_banco, criar_usuario, refeicao, produto)
 
+import casos_mercados  # noqa: E402
+
+casos_mercados.rodar(ok, secao, novo_banco, criar_usuario, plano_valido)
+
 # =======================================================================================
 secao("Formato para cada IA")
 msgs = [{"papel": "assistente", "texto": "oi"},
