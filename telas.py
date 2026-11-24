@@ -21,7 +21,7 @@ class Botao:
 
 @dataclass
 class Saida:
-    tipo: str = "texto"          # 'texto' | 'documento' | 'pedir_localizacao' | 'acao'
+    tipo: str = "texto"          # 'texto' | 'documento' | 'pedir_localizacao' | 'acao' | 'aviso'
     texto: str = ""
     botoes: list[list[Botao]] = field(default_factory=list)
     editar: bool = False         # substitui a mensagem do botão tocado (navegação)
@@ -29,6 +29,12 @@ class Saida:
     nome_arquivo: str = ""
     apagar_apos: float = 0       # segundos até a mensagem sumir sozinha (0 = fica)
     acao: str = ""               # tipo 'acao': o canal executa (ex.: montar o plano com animação)
+    # Aviso de erro mostrado no próprio toque do botão, sem mensagem nova no chat: a caixinha
+    # com OK do Telegram (ex.: tocar em "Continuar" sem nada marcado). Só aparece com
+    # alerta=True — ação comum (marcar/desmarcar) não mostra balão: o botão já é o retorno.
+    # O tipo 'aviso' é só isso: nada é desenhado, nenhuma mensagem muda.
+    toast: str = ""
+    alerta: bool = False
 
 
 def texto(t: str) -> Saida:

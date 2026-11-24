@@ -14,13 +14,15 @@ import re
 import sys
 from datetime import timedelta
 
+import httpx
 from dotenv import load_dotenv
 from telegram import (BotCommand, InlineKeyboardButton, InlineKeyboardMarkup, InputFile, KeyboardButton,
                       Message, ReplyKeyboardMarkup, Update)
 from telegram.constants import ChatAction, ParseMode
-from telegram.error import BadRequest, TelegramError
+from telegram.error import BadRequest, RetryAfter, TelegramError
 from telegram.ext import (Application, CallbackQueryHandler, CommandHandler, ContextTypes, MessageHandler,
                           filters)
+from telegram.request import HTTPXRequest
 
 load_dotenv()
 
@@ -57,7 +59,24 @@ log = logging.getLogger("rende")
 # --- configuração ------------------------------------------------------------
 TAMANHO_MAXIMO = 4000
 AVISO_DE_DEMORA_APOS = 25  # segundos
-ESPERA_ENTRE_ETAPAS = 0.8  # para a "animação" ser visível e não estourar o limite de edições
+# A "animação" do plano é feita editando a mesma mensagem. Cada edição já custa ~0,2 s de ida e
+# volta até o Telegram, então o intervalo real entre quadros é esta espera + a edição (~0,65 s):
+# visível para quem lê e longe do limite de edições do Telegram.
+ESPERA_ENTRE_ETAPAS = 0.45
+# Quanto o Rende espera antes de mostrar "digitando...". Abaixo disso a tela já ficou pronta
+# (botões resolvidos em código levam ~1 ms) e o aviso só atrasaria a resposta.
+ANTES_DE_DIGITANDO = 0.25
+# Conexão com o Telegram: o httpx fecha conexão parada em 5 s (padrão que o PTB não muda), e
+# reabrir custa ~0,7 s contra ~0,2 s de uma aberta. Como entre dois toques passa bem mais que
+# 5 s, toda resposta pagava o aperto de mão. Mantemos a conexão viva e aquecida de tempos em
+# tempos. Medido em 24/11: 712 ms -> 235 ms numa chamada depois de 8 s parado.
+# RENDE_MEDIR_LATENCIA=1 no .env faz cada toque de botão registrar o tempo de cada etapa.
+# Fica desligado por padrão para não encher o log em uso normal.
+MEDIR_LATENCIA = (os.getenv("RENDE_MEDIR_LATENCIA") or "").strip() in ("1", "true", "sim")
+KEEPALIVE_SEGUNDOS = 600.0
+# Medido em 24/11: a conexão continua rápida depois de 65 s e de 125 s parada (201-208 ms). Não
+# sabemos onde o servidor do Telegram desiste, então reaquecemos dentro da janela já comprovada.
+INTERVALO_AQUECIMENTO = 120
 NOME_BOT = "Rende"
 DESCRICAO = ("Seu amigo do mercado: monto o cardápio da semana no seu orçamento, com a lista de compras "
              "por embalagem, receitas passo a passo e promoções.")
@@ -90,11 +109,31 @@ def para_html(texto: str) -> str:
     texto = re.sub(r"(?m)^#{1,6}\s*(.+)$", r"*\1*", texto)
     texto = re.sub(r"(?m)^(\s*)\* ", r"\1• ", texto)
     texto = html.escape(texto, quote=False)
-    return re.sub(r"\*([^*\n]+?)\*", r"<b>\1</b>", texto)
+    # O par de asteriscos só vira negrito quando abre colado no texto e fecha colado nele:
+    # senão "2 * 3 = 6 e 4 * 5 = 20" deixaria o meio da frase em negrito.
+    return re.sub(r"\*(?!\s)([^*\n]+?)(?<!\s)\*", r"<b>\1</b>", texto)
 
 
 def sem_formatacao(texto: str) -> str:
     return texto.replace("*", "")
+
+
+# Tarefas que rodam em paralelo com a resposta (ex.: confirmar o toque no botão). A referência
+# fica guardada até terminarem: sem isso o Python pode recolher a tarefa antes da hora.
+_em_voo: set[asyncio.Task] = set()
+
+
+def _em_paralelo(corrotina) -> None:
+    """Dispara algo que a pessoa não precisa esperar; erro de rede aqui só vira aviso no log."""
+    async def protegida():
+        try:
+            await corrotina
+        except TelegramError as erro:
+            log.debug("Chamada em paralelo falhou (sem efeito para a pessoa): %s", erro)
+
+    tarefa = asyncio.create_task(protegida())
+    _em_voo.add(tarefa)
+    tarefa.add_done_callback(_em_voo.discard)
 
 
 def _teclado(saida: Saida) -> InlineKeyboardMarkup | None:
@@ -117,12 +156,33 @@ async def _enviar_texto(bot, chat_id: int, texto: str, teclado=None) -> Message 
     return enviada
 
 
+# Quando a pessoa toca vários botões seguidos (marcar/desmarcar numa tela de checkbox), as
+# edições são juntadas: só o estado final é desenhado. Protege do limite de edições do
+# Telegram e deixa a tela mais fluida — um toque isolado não espera nada.
+INTERVALO_MINIMO_EDICAO = 0.4
+_ultima_edicao: dict[tuple[int, int], float] = {}
+_versao_edicao: dict[tuple[int, int], int] = {}
+
+
 async def _editar(mensagem: Message, texto: str, teclado=None) -> bool:
     """Edita uma mensagem (navegação por botões). Devolve False se não deu para editar."""
     if len(texto) > TAMANHO_MAXIMO:
         return False
+    chave = (mensagem.chat_id, mensagem.message_id)
+    minha_vez = _versao_edicao[chave] = _versao_edicao.get(chave, 0) + 1
+    relogio = asyncio.get_running_loop().time
+    espera = INTERVALO_MINIMO_EDICAO - (relogio() - _ultima_edicao.get(chave, -999))
+    if espera > 0:
+        await asyncio.sleep(espera)
+        if _versao_edicao.get(chave) != minha_vez:
+            return True  # chegou um toque mais novo: ele desenha o estado final
+    _ultima_edicao[chave] = relogio()
     try:
         await mensagem.edit_text(para_html(texto), parse_mode=ParseMode.HTML, reply_markup=teclado)
+        return True
+    except RetryAfter as erro:  # limite de edições do Telegram: a próxima edição já leva o estado atual
+        log.warning("O Telegram pediu para esperar %.0f s antes de editar de novo.", erro.retry_after)
+        _ultima_edicao[chave] = relogio() + float(erro.retry_after)
         return True
     except BadRequest as erro:
         if "not modified" in str(erro).lower():
@@ -133,8 +193,16 @@ async def _editar(mensagem: Message, texto: str, teclado=None) -> bool:
 
 # --- "digitando..." -------------------------------------------------------------
 async def _manter_digitando(bot, chat_id: int, parar: asyncio.Event) -> None:
+    """Mantém o "digitando..." enquanto o Rende trabalha.
+
+    Começa esperando ANTES_DE_DIGITANDO: a maioria dos botões é resolvida em código, em
+    poucos milissegundos, e aí nenhuma chamada ao Telegram chega a ser feita. Sem essa
+    espera, todo toque pagava uma ida e volta de ~220 ms só para mostrar "digitando..."
+    numa tela que já estava pronta."""
     relogio = asyncio.get_running_loop().time
     inicio, avisou = relogio(), False
+    with contextlib.suppress(TimeoutError):
+        await asyncio.wait_for(parar.wait(), timeout=ANTES_DE_DIGITANDO)
     while not parar.is_set():
         if not avisou and relogio() - inicio >= AVISO_DE_DEMORA_APOS:
             avisou = True
@@ -154,8 +222,12 @@ async def _digitando(bot, chat_id: int):
     try:
         yield
     finally:
+        # Cancela em vez de esperar: se houver um "digitando..." em voo, aguardar a resposta
+        # do Telegram atrasaria a mensagem de verdade em mais uma ida e volta.
         parar.set()
-        await tarefa
+        tarefa.cancel()
+        with contextlib.suppress(asyncio.CancelledError):
+            await tarefa
 
 
 # --- desenhar as saídas ------------------------------------------------------------
@@ -174,6 +246,8 @@ async def mostrar(context: ContextTypes.DEFAULT_TYPE, chat_id: int, usuario: str
     """Desenha as telas. origem = mensagem do botão tocado (para editar em vez de mandar outra)."""
     bot = context.bot
     for saida in saidas:
+        if saida.tipo == "aviso":
+            continue  # só o toast/alerta do toque; nenhuma mensagem muda
         if saida.tipo == "acao":
             await executar_acao(context, chat_id, usuario, saida.acao, saida.texto, origem)
             continue
@@ -204,17 +278,42 @@ async def mostrar(context: ContextTypes.DEFAULT_TYPE, chat_id: int, usuario: str
         await _enviar_texto(bot, chat_id, saida.texto, teclado)
 
 
+def _confirmar_toque(consulta, saidas: list[Saida] | None = None) -> None:
+    """Tira o relógio do botão. Sem texto: marcar/desmarcar não mostra balão nenhum, porque o
+    próprio botão virando ✅/⬜ já é o retorno. Só erro de verdade (tocar em "Continuar" sem
+    nada marcado) abre a caixinha com OK. Vai em paralelo: ninguém espera por isso."""
+    if consulta is None:
+        return
+    erro = next((s for s in (saidas or []) if s.alerta and s.toast), None)
+    if erro is None:
+        _em_paralelo(consulta.answer())
+    else:
+        _em_paralelo(consulta.answer(text=erro.toast[:200], show_alert=True))
+
+
 async def executar_acao(context: ContextTypes.DEFAULT_TYPE, chat_id: int, usuario: str, acao: str,
-                        texto: str = "", origem: Message | None = None) -> None:
+                        texto: str = "", origem: Message | None = None, consulta=None) -> None:
     if acao == "pl:montar":
+        _confirmar_toque(consulta)  # ação demorada: confirma o toque já
         await montar_com_animacao(context, chat_id, usuario, texto, origem)
     elif acao.startswith("pl:tro:"):
+        _confirmar_toque(consulta)
         _, _, dia, tipo = acao.split(":")
         await trocar_com_progresso(context, chat_id, usuario, dia, tipo, texto, origem)
     else:
+        relogio = asyncio.get_running_loop().time
+        t0 = relogio()
         async with _digitando(context.bot, chat_id):
             saidas = await atendimento.acao(usuario, acao)
+        # O trabalho leva ~1 ms, então dá para confirmar o toque já sabendo o que dizer no toast
+        t1 = relogio()
+        _confirmar_toque(consulta, saidas)
+        t2 = relogio()
         await mostrar(context, chat_id, usuario, saidas, origem)
+        if MEDIR_LATENCIA and consulta is not None:
+            log.info("latencia [%s]: estado %.1f ms | answerCallbackQuery %.1f ms (em paralelo) | "
+                     "edicao %.1f ms | total %.1f ms", acao, (t1 - t0) * 1000, (t2 - t1) * 1000,
+                     (relogio() - t2) * 1000, (relogio() - t0) * 1000)
 
 
 async def montar_com_animacao(context, chat_id: int, usuario: str, pedido: str = "",
@@ -363,14 +462,37 @@ async def tipo_nao_suportado(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
 
 async def botao(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Toque num botão. A confirmação vai SEM esperar a resposta do Telegram (esperar custava
+    uma ida e volta de ~0,2 s antes de qualquer trabalho começar); o Telegram aceita a
+    confirmação em até 15 s. Quem a dispara é o `executar_acao`, que sabe o texto do toast."""
     consulta = update.callback_query
-    await consulta.answer()  # tira o "relógio" do botão na hora
+    inicio = asyncio.get_running_loop().time()
     await executar_acao(context, consulta.message.chat.id, str(consulta.from_user.id), consulta.data,
-                        origem=consulta.message)
+                        origem=consulta.message, consulta=consulta)
+    if MEDIR_LATENCIA:
+        log.info("latencia: botao %s respondido em %.0f ms (trabalho + edicao)",
+                 consulta.data.split(":")[0], (asyncio.get_running_loop().time() - inicio) * 1000)
 
 
 async def ao_dar_erro(update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Qualquer falha não prevista. O erro vai inteiro para o log e a pessoa recebe um aviso
+    curto: sem isto, o 'digitando...' simplesmente parava e o chat ficava mudo."""
     log.error("Erro inesperado ao tratar uma mensagem", exc_info=context.error)
+    chat = getattr(update, "effective_chat", None)
+    if chat is None:  # erro fora de uma conversa (ex.: no polling): não há a quem avisar
+        return
+    with contextlib.suppress(TelegramError):
+        await context.bot.send_message(chat.id, prompts.ERRO_INESPERADO)
+
+
+async def _manter_conexao_quente(context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Tarefa periódica: uma chamada mínima só para a conexão com o Telegram não esfriar.
+
+    Abrir conexão nova (DNS + TLS) custa ~0,7 s; usar uma já aberta custa ~0,2 s. Entre dois
+    toques de botão costuma passar bem mais tempo do que o servidor espera, e sem isto toda
+    primeira resposta depois de uma pausa pagava o aperto de mão de novo."""
+    with contextlib.suppress(TelegramError):
+        await context.bot.get_me()
 
 
 async def ao_ligar(app: Application) -> None:
@@ -381,7 +503,22 @@ async def ao_ligar(app: Application) -> None:
         await app.bot.set_my_commands(COMANDOS)
     except TelegramError as erro:
         log.warning("Não consegui atualizar nome/descrição/comandos no Telegram: %s", erro)
+    if app.job_queue:
+        app.job_queue.run_repeating(_manter_conexao_quente, interval=INTERVALO_AQUECIMENTO, first=INTERVALO_AQUECIMENTO)
     log.info("Bot @%s ligado. Para desligar, aperte Ctrl+C.", app.bot.username)
+
+
+def _conexao_telegram(tamanho: int = 256) -> HTTPXRequest:
+    """Conexão com a API do Telegram, com keepalive longo.
+
+    O PTB monta `httpx.Limits(max_connections=...)` e deixa o `keepalive_expiry` no padrão do
+    httpx, que é 5 segundos: entre um toque e outro a conexão morria e a resposta seguinte
+    pagava DNS + TLS outra vez. `httpx_kwargs` é aplicado por último pelo PTB, então este
+    `limits` substitui o dele. Só a conexão das mensagens muda; a do getUpdates fica como está
+    (ela já vive aberta por causa do long polling, e tem tempos próprios)."""
+    return HTTPXRequest(connection_pool_size=tamanho,
+                        httpx_kwargs={"limits": httpx.Limits(max_connections=tamanho,
+                                                             keepalive_expiry=KEEPALIVE_SEGUNDOS)})
 
 
 def main() -> None:
@@ -392,6 +529,7 @@ def main() -> None:
         log.warning("Sem ANTHROPIC_API_KEY: o cardápio vai ser feito pelo Gemini (o roteador avisa no log).")
 
     app = (Application.builder().token(os.environ["TELEGRAM_BOT_TOKEN"])
+           .request(_conexao_telegram())
            .concurrent_updates(True).post_init(ao_ligar).build())
     app.add_handler(CommandHandler("start", cmd_start))
     app.add_handler(CommandHandler("perfil", cmd_perfil))

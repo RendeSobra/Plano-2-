@@ -42,6 +42,10 @@ class RespostaIA:
     bruto: Any = None
     motivo: str = ""            # preenchido pelo roteador: por que este modelo foi usado
     problemas: list[str] = field(default_factory=list)  # preenchido pelo roteador na validação
+    # O que a conferência em código apurou desta resposta (plano já montado, cesta calculada...).
+    # Fica guardado na própria resposta: quem chamou o roteador lê daqui, em vez de um dicionário
+    # por fora indexado pelo id() do objeto (que o Python pode reciclar).
+    conferencia: Any = None
 
 
 class ErroIA(Exception):

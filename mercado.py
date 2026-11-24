@@ -86,9 +86,10 @@ def _salvar(plano: dict) -> dict:
     return plano
 
 
-def alternar(usuario: str, indice: int) -> dict:
-    """Marca ou desmarca um item (⬜ <-> ✅) e guarda no banco."""
-    plano = banco.plano_atual(usuario)
+def alternar(usuario: str, indice: int, plano: dict | None = None) -> dict:
+    """Marca ou desmarca um item (⬜ <-> ✅) e guarda no banco.
+    `plano` evita ler e converter o plano de novo quando quem chamou já o tem em mãos."""
+    plano = plano if plano is not None else banco.plano_atual(usuario)
     linha = linha_por_indice(plano, indice)
     if linha is None:
         return plano
@@ -113,10 +114,10 @@ def ler_preco(texto: str) -> float | None:
     return round(valor, 2) if 0 < valor < 10_000 else None
 
 
-def informar_preco(usuario: str, indice: int, preco: float) -> tuple[dict, dict | None]:
+def informar_preco(usuario: str, indice: int, preco: float, plano: dict | None = None) -> tuple[dict, dict | None]:
     """A pessoa pagou outro preço numa embalagem: guarda no plano (o total parcial usa o preço real),
     marca o item como comprado e alimenta a tabela de preços (origem 'usuario')."""
-    plano = banco.plano_atual(usuario)
+    plano = plano if plano is not None else banco.plano_atual(usuario)
     linha = linha_por_indice(plano, indice)
     if linha is None:
         return plano, None

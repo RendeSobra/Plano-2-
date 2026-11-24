@@ -56,6 +56,12 @@ ESCRITA_CACHE = 1.25
 # também usa "medium" (conferido em 24/11: o Haiku 5.5 aceita low a max e o padrão dele é medium;
 # a troca custa ~US$ 0,001 nele, e nos testes reais ele estourou o orçamento por pouco).
 TAREFAS_ESFORCO_MEDIO = {"troca", "cardapio", "complexo", "otimizar_lista"}
+# Teto de tokens de saída por tarefa (só o Claude usa). Não muda o preço — paga-se o que o modelo
+# escreve —, mas a Anthropic reserva o teto na conta de tokens por minuto: pedir 32 mil para
+# responder "oi" tira folga de limite de todo mundo. O cardápio continua com o teto alto porque
+# em 24/11 o Sonnet chegou a usar 16 mil (raciocínio + JSON) e a resposta saiu cortada.
+MAX_TOKENS_TAREFA = {"cardapio": 32000, "complexo": 16000, "otimizar_lista": 16000, "troca": 16000}
+MAX_TOKENS_PADRAO = 8000  # conversa, cadastro, mídia, receita, encarte
 _CLAUDE = {"haiku": ("CLAUDE_MODELO_BARATO", "claude-haiku-5-5", "LIMITE_HAIKU_DIA", 500),
            "sonnet": ("CLAUDE_MODELO_PADRAO", "claude-sonnet-5-5", "LIMITE_SONNET_DIA", 100),
            "opus": ("CLAUDE_MODELO_FORTE", "claude-opus-5-5", "LIMITE_OPUS_DIA", 20)}
@@ -176,9 +182,14 @@ def esforco(nivel: Nivel, tarefa: str) -> str | None:
     return "medium" if tarefa in TAREFAS_ESFORCO_MEDIO else "low"
 
 
+def max_tokens(tarefa: str) -> int:
+    """Teto de tokens de saída da tarefa (ver MAX_TOKENS_TAREFA)."""
+    return MAX_TOKENS_TAREFA.get(tarefa, MAX_TOKENS_PADRAO)
+
+
 async def _chamar(nivel: Nivel, tarefa: str, **kwargs) -> RespostaIA:
     resposta = await ADAPTADORES[nivel.provedor].gerar(modelo=nivel.modelo, esforco=esforco(nivel, tarefa),
-                                                        **kwargs)
+                                                        max_tokens=max_tokens(tarefa), **kwargs)
     resposta.nivel = nivel.nome
     return resposta
 

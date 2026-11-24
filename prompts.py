@@ -198,10 +198,14 @@ TROCA_SEM_FOLGA = ("Não achei um prato novo que caiba no orçamento 😕 Sem o 
                    "no /perfil e refazer o plano.")
 PLANO_PRECISA_CADASTRO = "Antes de montar o plano, preciso terminar seu cadastro rapidinho 🙂"
 SEM_PLANO = "Você ainda não tem um plano. Quer que eu monte agora?"
+PLANO_SEM_REFEICOES = ("Seu plano ficou sem nenhuma refeição 😅 Quer que eu monte outro? "
+                       "Dá para escolher de novo as refeições no /perfil.")
 
 LIMITE_DIA = ("Hoje a gente já conversou bastante 😊 Você chegou ao limite de {limite} "
               "mensagens por dia. Amanhã eu continuo te ajudando!")
 ERRO_IA = "Ops, tive um probleminha para pensar na resposta agora. Pode mandar de novo?"
+# Falha que o código não previu (o erro vai inteiro para o log, nunca para a pessoa)
+ERRO_INESPERADO = "Ops, algo deu errado aqui do meu lado 😕 Pode tentar de novo?"
 AUDIO_LONGO = "Esse áudio passou de 2 minutos 😅 Consegue mandar um mais curto (até 2 minutos) ou escrever?"
 ARQUIVO_GRANDE = "Esse arquivo é grande demais pra mim (o máximo é 10 MB). Pode mandar um menor?"
 ERRO_DOWNLOAD = "Não consegui abrir esse arquivo. Pode mandar de novo?"
