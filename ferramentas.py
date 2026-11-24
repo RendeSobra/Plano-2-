@@ -97,8 +97,10 @@ DEFINICOES = [
          "dia_semana": {"type": "string", "enum": list(_NOMES_DIA_SEMANA)},
          "horario": {"type": "string", "description": "HH:MM, ex.: 09:00"}}}},
     {"nome": "pedir_especialista",
-     "descricao": "Encaminha um pedido complexo para um modelo mais forte responder neste turno.",
-     "parametros": {"type": "object", "required": ["motivo", "resumo_do_pedido"], "properties": {
+     "descricao": "Encaminha um pedido complexo SOBRE O RENDE (cardápio, compras, orçamento) para um modelo "
+                  "mais forte responder neste turno. Nunca para assunto de fora.",
+     "parametros": {"type": "object", "required": ["motivo", "resumo_do_pedido", "no_escopo"], "properties": {
+         "no_escopo": {"type": "boolean", "description": "true só se o pedido é sobre o Rende"},
          "motivo": {"type": "string"},
          "resumo_do_pedido": {"type": "string", "description": "O pedido completo, com o que a pessoa disse"}}}},
 ]
@@ -251,7 +253,9 @@ def _configurar_avisos(ctx: Contexto, ativo: bool, dia_semana: str = "", horario
     return {"ok": True, **campos}
 
 
-def _pedir_especialista(ctx: Contexto, motivo: str, resumo_do_pedido: str) -> dict:
+def _pedir_especialista(ctx: Contexto, motivo: str, resumo_do_pedido: str, no_escopo: bool = False) -> dict:
+    if not no_escopo:  # C3: assunto de fora nunca sobe para o Claude
+        return {"erro": "fora do escopo: não encaminhe; responda com no_escopo: nao"}
     ctx.especialista = resumo_do_pedido
     log.info("Pedido marcado como complexo: %s", motivo[:120])
     return {"ok": True}

@@ -14,6 +14,7 @@ from collections import defaultdict
 import banco
 import cadastro
 import cardapio
+import escopo
 import ferramentas
 import mercado
 import pdf
@@ -128,7 +129,21 @@ async def acao(usuario: str, acao_txt: str) -> list[Saida]:
         return await _acao_plano(usuario, acao_txt)
     if acao_txt.startswith("mm:"):
         return _acao_mercado(usuario, acao_txt)
+    if acao_txt == "pr:ver":
+        cidade = banco.usuario(usuario).get("cidade") or "Goiânia"
+        return [telas.promocoes(banco.promocoes_validas(cidade=cidade, limite=100), cidade, prompts.SEM_PROMOCOES)]
     return [telas.texto("Não entendi esse botão 🤔")]
+
+
+def _fora_do_escopo(usuario: str, passo: str | None) -> list[Saida]:
+    """C3: mensagem fixa no lugar do texto do modelo. Conta no limite diário; o log diz só isso."""
+    banco.contar_mensagem(usuario)
+    log.info("fora_do_escopo")
+    perfil = banco.usuario(usuario)
+    saidas = [telas.fora_do_escopo(escopo.mensagem_fixa(perfil.get("nome"), prompts.FORA_DO_ESCOPO))]
+    if passo:  # no meio do cadastro: mostra de novo a pergunta
+        saidas.append(cadastro.tela_do_passo(perfil, passo))
+    return saidas
 
 
 def _acao_mercado(usuario: str, acao_txt: str) -> list[Saida]:
@@ -383,6 +398,8 @@ async def responder(usuario: str, texto: str, anexo: dict | None = None) -> list
             if preco is not None:
                 banco.contar_mensagem(usuario)
                 return preco
+        if not anexo and escopo.filtro_rapido(texto):  # claramente de fora: nem chama a IA
+            return _fora_do_escopo(usuario, passo)
 
         texto_hist = f"{ROTULOS[anexo['tipo']]} {texto}".strip() if anexo else texto
         mensagem = {"papel": "usuario", "texto": texto_hist, **({"anexo": anexo} if anexo else {})}
@@ -394,10 +411,15 @@ async def responder(usuario: str, texto: str, anexo: dict | None = None) -> list
         if versao != _versoes[usuario]:
             log.info("Resposta descartada: a pessoa recomeçou enquanto a IA pensava.")
             return []
+        no_escopo, final = escopo.separar(final)
+        if no_escopo is False:  # o código descarta o texto do modelo (e as ações que ele pediu)
+            return _fora_do_escopo(usuario, passo)
+        if no_escopo is None and final:
+            log.warning("Resposta da IA sem o campo no_escopo (tratada como dentro do escopo).")
 
         banco.adicionar_mensagem(usuario, "usuario", texto_hist)
-        if final:
-            banco.adicionar_mensagem(usuario, "assistente", final)
+        if final:  # guardado com o campo, para o modelo manter o formato nas próximas respostas
+            banco.adicionar_mensagem(usuario, "assistente", f"no_escopo: sim\n{final}")
         banco.contar_mensagem(usuario)
 
         saidas = ([telas.texto(final)] if final else []) + ctx.saidas

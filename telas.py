@@ -174,6 +174,26 @@ def lista(plano: dict, editar: bool = True) -> Saida:
     return tela("\n".join(linhas_txt), botoes, editar)
 
 
+# --- escopo e promoções ------------------------------------------------------------
+def fora_do_escopo(texto_fixo: str) -> Saida:
+    """C3: resposta fixa (o texto do modelo foi descartado) com os botões do pedido."""
+    return tela(texto_fixo, [[Botao("📅 Meu cardápio", "pl:dia"), Botao("🔥 Promoções", "pr:ver"),
+                              Botao("🛒 Lista", "pl:lista")]])
+
+
+def promocoes(promos: list[dict], cidade: str, vazio: str, editar: bool = True) -> Saida:
+    if not promos:
+        return tela(vazio, [[Botao("🏠 Resumo", "pl:res")]], editar)
+    linhas_txt = [f"🔥 *Promoções em {cidade}*", ""]
+    for p in promos[:15]:
+        descricao = " ".join(x for x in (p["produto"], p.get("marca"), p.get("tamanho")) if x)
+        condicao = f" ({p['condicao']})" if p.get("condicao") else ""
+        linhas_txt.append(f"• {descricao}: *{brl(p['preco'])}* no {p['mercado']} até {data_br(p['validade'])}{condicao}")
+    if len(promos) > 15:
+        linhas_txt += ["", f"...e mais {len(promos) - 15}. Pergunte por um produto que eu procuro."]
+    return tela("\n".join(linhas_txt), [[Botao("🏠 Resumo", "pl:res")]], editar)
+
+
 # --- 🛒 Modo mercado (Pedido I) ----------------------------------------------------
 def _rotulo_item(plano: dict, linha: dict, marcado: bool) -> str:
     pago = (plano.get("mercado") or {}).get("precos", {}).get(cesta.chave(linha["item"]))

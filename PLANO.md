@@ -11,7 +11,7 @@ O **Pedido I** (mesmo arquivo) manda executar os itens pendentes do H numa ordem
 com decisões do dono que valem por cima do H (ver "Decisões do Pedido I").
 Histórico, testes reais e detalhes: [CONTEXTO.md](CONTEXTO.md).
 
-Testes automáticos: `.venv\Scripts\python testes\testar.py` (**184 de 184 OK em 24/11/2026**).
+Testes automáticos: `.venv\Scripts\python testes\testar.py` (**197 de 197 OK em 24/11/2026**).
 
 ## Pedidos e situação
 
@@ -26,7 +26,7 @@ Testes automáticos: `.venv\Scripts\python testes\testar.py` (**184 de 184 OK em
 | F | Escada de modelos: Gemini → Haiku → Sonnet → Opus, limites por modelo, cache, /custos | ✅ Feito e testado no celular (23/11) |
 | G | Mensagens de troca e PDF sem poluir o chat; contexto no GitHub | ✅ Feito |
 | H | Retomada com a especificação completa (PARTES A a F) | 🔧 PARTE A ✅ (24/11). Itens pendentes: ver Pedido I |
-| I | Executar os pendentes do H sem parar entre etapas + Modo mercado + PDF com caixinhas | 🔧 Custo do cardápio ✅ · C10 ✅ · C9, C11 e Modo mercado ✅ · C6 ✅ · C2 ✅ (24/11). Próximo: C3 |
+| I | Executar os pendentes do H sem parar entre etapas + Modo mercado + PDF com caixinhas | 🔧 Custo do cardápio ✅ · C10 ✅ · C9, C11 e Modo mercado ✅ · C6 ✅ · C2 ✅ · C3 ✅ (24/11). Próximo: C13 |
 
 ## Pedido H: situação de cada item da PARTE C (conferido em 24/11/2026)
 
@@ -34,7 +34,7 @@ Testes automáticos: `.venv\Scripts\python testes\testar.py` (**184 de 184 OK em
 |---|---|---|
 | C1 Arquitetura | 🟡 | Só a pasta `coletor/` (vem no C13) |
 | C2 Escada de modelos | ✅ (24/11) | `/custos` mostra as subidas de nível do dia e do mês, o custo médio por cardápio e em quantos o Opus entrou. Haiku na troca com effort "medium" (conferido: o Haiku 5.5 aceita low a max e o padrão dele é medium; a troca custa ~US$ 0,001 e exige conta de orçamento). Limite de saída de 32 mil tokens com streaming (decisão de 24/11). Cardápio compacto e Sonnet em effort "low" (Pedido I): ver "Custo do cardápio" |
-| C3 Escopo | ❌ | Hoje é só uma frase no prompt. Falta o campo `no_escopo` conferido em código, as mensagens fixas com botões, o log "fora_do_escopo" e o teste com 40 mensagens |
+| C3 Escopo | ✅ (24/11) | `escopo.py`, três camadas: (1) filtro em código antes de qualquer IA para o que é claramente de fora e não tem nenhuma palavra do Rende (custo zero); (2) toda resposta final começa com a linha "no_escopo: sim/nao" (linha de texto, não JSON forçado, para funcionar igual no Gemini e no Claude com ferramentas); com "nao" o código descarta o texto e manda 1 de 4 mensagens fixas com [📅 Meu cardápio] [🔥 Promoções] [🛒 Lista]; (3) o especialista (Claude) exige no_escopo = true. Conta no limite diário, não entra no histórico e o log diz só "fora_do_escopo". Teste com 40 mensagens: o filtro pega 17 de 20 de fora (todas as de manipulação) e não barra nenhuma de dentro nem as mistas. Sem o campo, a resposta é tratada como dentro (fica um aviso no log). Tela [🔥 Promoções] simples já existe (C14 completa) |
 | C4 Personalidade | ✅ | O resumo semanal depende do C14 |
 | C5 Memória | ✅ | Funciona com nomes diferentes do pedido: despensa é uma coluna de `usuarios` e os custos ficam em `uso_ia`. `/perfil` não edita cidade nem localização |
 | C6 Entender qualquer mensagem | ✅ (24/11) | Foto ou PDF de encarte: a ferramenta `salvar_promocoes_de_encarte` salva as ofertas em `promocoes` (origem "usuario"), conferindo preço, validade (sem data impressa: 6 dias; vencida: nada) e repetição. Arquivo de áudio (mp3, m4a...) aceito como a mensagem de voz (só Gemini; como documento, o Telegram não dá a duração e vale o limite de 10 MB). A oferta de mercados próximos ao receber a localização entra com o C12 |
@@ -58,8 +58,8 @@ Sem parar entre os itens; resumo curto ao fim de cada C.
 4. ✅ C9, C11 e **Modo mercado** (marcar o que já foi comprado; PDF com caixinhas clicáveis).
 5. ✅ C6 (entender qualquer mensagem) (24/11).
 6. ✅ C2 (escada de modelos) (24/11).
-7. ⏳ **Próximo:** C3 (escopo).
-8. C13 Fases 1 e 2 (o Claude escolhe as redes pelos critérios do dono; não para).
+7. ✅ C3 (escopo) (24/11).
+8. ⏳ **Próximo:** C13 Fases 1 e 2 (o Claude escolhe as redes pelos critérios do dono; não para).
 9. C14 → C15 → C12.
 10. Relatório final (PARTE F) e roteiro do teste no celular (o dono testa depois de trocar as chaves).
 
