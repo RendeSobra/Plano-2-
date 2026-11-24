@@ -91,6 +91,20 @@ por texto, áudio e foto, e uma escada de modelos de IA que sobe de nível só q
     passou a ser redesenhada depois do limite do Telegram; o aviso de cache do `/custos` faz
     a conta em dinheiro; mídia com teto de 16 mil tokens; toque confirmado mesmo com erro.
     Juntado na main com o PR #1 (337 testes).
+13. **Teste no celular depois dos dois PRs (tarde de 24/11, parcial):** bot ligado neste
+    computador com `RENDE_MEDIR_LATENCIA=1` (só uma cópia; conferido antes pelo `getUpdates`).
+    Nenhum erro no registro das 14:16 às 15:05. Botões usados: Modo mercado, plano (resumo,
+    dia, lista, PDF), Onde comprar (+ [📋 Atacadão]), Promoções e Mercados perto de mim.
+    Tempos do toque até a tela mudar:
+    - botões simples: **360 a 420 ms** (antes do PR #2, ~930 ms). Quase tudo é a ida e volta
+      ao Telegram (~350 ms nesta conexão); o trabalho do bot fica abaixo de 50 ms. Os ~220 ms
+      do colaborador foram medidos em outra rede.
+    - Onde comprar: **0,8 a 1,2 s** (0,5 a 0,8 s de cálculo dentro do bot; investigar).
+    - PDF: 1,5 s.
+    - Mercados perto de mim: **44 s na 1ª vez** (o 1º servidor Overpass passou do tempo e o 2º
+      respondeu: 9 mercados no raio, 8 na tela); 0,6 s nas seguintes.
+    O que não passa por botão (cadastro, cardápio novo, áudio, fotos, `/promo`, `/coletar`,
+    fora do escopo...) não aparece no registro: conferir com o dono o que já foi feito do roteiro.
 
 ## 3. Arquitetura (cada arquivo com um papel)
 
@@ -155,7 +169,8 @@ coletor), `estado` (marcadores do robô, ex.: última promoção avisada), `uso_
 ## 5. Como rodar e testar
 
 Veja o [README](README.md). Testes automáticos: `.venv\Scripts\python testes\testar.py`
-(**197 de 197 OK** em 24/11/2026). Ajudantes do teste pelo celular em `testes/celular/`.
+(**337 de 337 OK** em 24/11/2026, com os PRs #1 e #2). Para medir a velocidade dos
+botões, ligar o bot com `RENDE_MEDIR_LATENCIA=1` (cada toque vira uma linha "latencia" no registro). Ajudantes do teste pelo celular em `testes/celular/`.
 
 ## 6. Resultado do teste real no celular (23/11/2026)
 
@@ -203,7 +218,13 @@ Em 23/11:
 
 ## 8. Próximos passos (pendentes)
 
-**Antes de tudo (só o dono):** trocar as 3 chaves e colar as novas no `.env` local.
+✅ As 3 chaves foram trocadas pelo dono em 24/11 e coladas no `.env` dos dois computadores.
+
+**Agora:** terminar o roteiro do teste no celular ([docs/RELATORIO.md](docs/RELATORIO.md),
+seção 4; parcial em 24/11, item 13 da linha do tempo) e decidir o custo do cardápio
+(opções a, b e c no relatório). Melhorias vistas no teste, só se o dono pedir: consultar os
+servidores Overpass ao mesmo tempo (a 1ª busca de mercados levou 44 s) e ver por que o
+"Onde comprar" gasta 0,5 a 0,8 s de cálculo.
 
 A ordem agora é a da PARTE D do Pedido H (lista completa e situação de cada item no
 [PLANO.md](PLANO.md)). As pendências antigas entram assim:
