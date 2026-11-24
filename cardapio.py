@@ -55,36 +55,47 @@ class SemFolga(PlanoInvalido):
 
 
 # --- esquemas JSON pedidos à IA ------------------------------------------------
-_INGREDIENTE = {"type": "object", "additionalProperties": False,
-                "required": ["item", "quantidade", "unidade"],
-                "properties": {"item": {"type": "string"}, "quantidade": {"type": "number"},
-                               "unidade": {"type": "string", "enum": ["g", "ml", "un"]}}}
+# Formato COMPACTO (24/11): o que a IA escreve é o que se paga. O cardápio volta só com
+# pratos, ingredientes com quantidade e compras, sem modo de preparo (a receita é gerada
+# quando a pessoa abre o prato). Chaves curtas, café/lanche repetido numa entrada só
+# ("dias": [...]), ingrediente sem unidade (vem da embalagem) e "perecível" deduzido da
+# seção. Medido com o plano real de 23/11: 7.446 -> ~4.700 tokens de JSON.
+# O resto do código continua usando o formato interno (ver expandir()).
+_INGR = {"type": "object", "additionalProperties": False, "required": ["item", "qtd"],
+         "properties": {"item": {"type": "string"}, "qtd": {"type": "number"}}}
+_PRATO = {  # campos comuns ao cardápio e à troca
+    "prato": {"type": "string"},
+    "min": {"type": "integer"},
+    "equip": {"type": "array", "items": {"type": "string", "enum": list(UTENSILIOS)}},
+    "ingr": {"type": "array", "items": _INGR},
+    "sobra": {"type": "string"},
+}
 _REFEICAO = {"type": "object", "additionalProperties": False,
-             "required": ["dia", "tipo", "prato", "tempo_min", "equipamentos", "ingredientes", "sobra_planejada"],
-             "properties": {
-                 "dia": {"type": "string", "enum": [d for d, _ in DIAS]},
-                 "tipo": {"type": "string", "enum": [r for r, _, _ in REFEICOES]},
-                 "prato": {"type": "string"},
-                 "tempo_min": {"type": "integer"},
-                 "equipamentos": {"type": "array", "items": {"type": "string", "enum": list(UTENSILIOS)}},
-                 "ingredientes": {"type": "array", "items": _INGREDIENTE},
-                 "sobra_planejada": {"type": "string"}}}
-_PRODUTO = {"type": "object", "additionalProperties": False,
-            "required": ["item", "nome", "embalagem", "tamanho", "unidade", "preco", "secao", "perecivel",
-                         "promocao_id"],
-            "properties": {
-                "item": {"type": "string"}, "nome": {"type": "string"}, "embalagem": {"type": "string"},
-                "tamanho": {"type": "number"}, "unidade": {"type": "string", "enum": ["g", "ml", "un"]},
-                "preco": {"type": "number"}, "secao": {"type": "string", "enum": SECOES},
-                "perecivel": {"type": "boolean"}, "promocao_id": {"type": "integer"}}}
-ESQUEMA_PLANO = {"type": "object", "additionalProperties": False,
-                 "required": ["refeicoes", "produtos", "reaproveitamento"],
+             "required": ["dias", "tipo", "prato", "min", "equip", "ingr", "sobra"],
+             "properties": {"dias": {"type": "array", "items": {"type": "string", "enum": [d for d, _ in DIAS]}},
+                            "tipo": {"type": "string", "enum": [r for r, _, _ in REFEICOES]},
+                            **_PRATO}}
+_REFEICAO_TROCA = {"type": "object", "additionalProperties": False,
+                   "required": ["prato", "min", "equip", "ingr", "sobra"], "properties": _PRATO}
+_COMPRA = {"type": "object", "additionalProperties": False,
+           "required": ["item", "emb", "tam", "un", "preco", "secao", "promo"],
+           "properties": {"item": {"type": "string"}, "emb": {"type": "string"}, "tam": {"type": "number"},
+                          "un": {"type": "string", "enum": ["g", "ml", "un"]}, "preco": {"type": "number"},
+                          "secao": {"type": "string", "enum": SECOES}, "promo": {"type": "integer"}}}
+ESQUEMA_PLANO = {"type": "object", "additionalProperties": False, "required": ["refeicoes", "compras"],
                  "properties": {"refeicoes": {"type": "array", "items": _REFEICAO},
-                                "produtos": {"type": "array", "items": _PRODUTO},
-                                "reaproveitamento": {"type": "array", "items": {"type": "string"}}}}
-ESQUEMA_TROCA = {"type": "object", "additionalProperties": False, "required": ["refeicao", "produtos_novos"],
-                 "properties": {"refeicao": _REFEICAO,
-                                "produtos_novos": {"type": "array", "items": _PRODUTO}}}
+                                "compras": {"type": "array", "items": _COMPRA}}}
+ESQUEMA_TROCA = {"type": "object", "additionalProperties": False, "required": ["refeicao", "compras_novas"],
+                 "properties": {"refeicao": _REFEICAO_TROCA,
+                                "compras_novas": {"type": "array", "items": _COMPRA}}}
+# O que estraga não vai para a despensa da semana seguinte.
+PERECIVEL = {"Hortifrúti": True, "Açougue e aves": True, "Ovos e laticínios": True, "Padaria": True,
+             "Mercearia": False, "Temperos e outros": False}
+_ORDEM_DIA = {d: i for i, (d, _) in enumerate(DIAS)}
+_ORDEM_REFEICAO = {r: i for i, (r, _, _) in enumerate(REFEICOES)}
+# Quantidade de um ingrediente numa refeição que só pode ser engano (ex.: 300 "un" de ovo),
+# para até 4 porções; cresce com a família.
+LIMITE_QTD = {"un": 60, "g": 6000, "ml": 6000}
 ESQUEMA_RECEITA = {"type": "object", "additionalProperties": False,
                    "required": ["ingredientes", "passos", "tempo_min", "dica"],
                    "properties": {"ingredientes": {"type": "array", "items": {"type": "string"}},
@@ -97,6 +108,35 @@ def ler_json(texto: str) -> dict:
     texto = (texto or "").strip()
     texto = re.sub(r"^```(?:json)?\s*|\s*```$", "", texto)
     return json.loads(texto)
+
+
+def produto_de_compra(c: dict) -> dict:
+    """Uma compra do formato compacto -> produto do formato interno (o que cesta, telas e PDF usam)."""
+    return {"item": c["item"], "nome": c["item"], "embalagem": c["emb"], "tamanho": c["tam"], "unidade": c["un"],
+            "preco": c["preco"], "secao": c["secao"], "perecivel": PERECIVEL.get(c["secao"], True),
+            "promocao_id": int(c.get("promo") or 0)}
+
+
+def refeicoes_de(entrada: dict, unidades: dict[str, str]) -> list[dict]:
+    """Uma entrada compacta (um prato em vários dias) -> uma refeição interna por dia.
+    A unidade de cada ingrediente é a da embalagem; sem embalagem fica '?' e a conferência reprova."""
+    return [{"dia": dia, "tipo": entrada["tipo"], "prato": entrada["prato"], "tempo_min": entrada["min"],
+             "equipamentos": list(entrada.get("equip") or []),
+             "ingredientes": [{"item": i["item"], "quantidade": i["qtd"],
+                               "unidade": unidades.get(cesta.chave(i["item"]), "?")} for i in entrada["ingr"]],
+             "sobra_planejada": entrada.get("sobra") or ""}
+            for dia in entrada["dias"]]
+
+
+def expandir(dados: dict) -> dict:
+    """Resposta compacta da IA -> plano no formato interno (refeicoes por dia + produtos)."""
+    produtos = [produto_de_compra(c) for c in dados["compras"]]
+    unidades: dict[str, str] = {}
+    for p in produtos:
+        unidades.setdefault(cesta.chave(p["item"]), p["unidade"])  # item repetido: vale o primeiro (como na cesta)
+    refeicoes = [r for entrada in dados["refeicoes"] for r in refeicoes_de(entrada, unidades)]
+    refeicoes.sort(key=lambda r: (_ORDEM_DIA.get(r["dia"], 99), _ORDEM_REFEICAO.get(r["tipo"], 99)))
+    return {"refeicoes": refeicoes, "produtos": produtos}
 
 
 def orcamento_semanal(perfil: dict) -> float:
@@ -160,9 +200,17 @@ def conferir(plano: dict, perfil: dict, calc: dict, orcamento: float,
     if repetidos:
         graves.append("o mesmo horário aparece mais de uma vez: " + ", ".join(f"{t} de {d}" for d, t in repetidos))
 
+    escala = max(1.0, cesta.porcoes(perfil.get("adultos"), perfil.get("criancas")) / 4)
     for r in plano.get("refeicoes", []):
         if not r.get("ingredientes"):
             graves.append(f"'{r.get('prato')}' está sem ingredientes")
+        for ing in r.get("ingredientes", []):
+            qtd, limite_un = float(ing.get("quantidade") or 0), LIMITE_QTD.get(ing.get("unidade"))
+            if qtd <= 0:
+                graves.append(f"quantidade zerada de {ing['item']} em '{r.get('prato')}'")
+            elif limite_un and qtd > limite_un * escala:
+                graves.append(f"quantidade fora do normal: {qtd:g} {ing['unidade']} de {ing['item']} em "
+                              f"'{r.get('prato')}' (a quantidade vai na unidade da embalagem)")
     for p in plano.get("produtos", []):
         if float(p.get("tamanho") or 0) <= 0 or float(p.get("preco") or 0) <= 0:
             graves.append(f"embalagem inválida para '{p.get('item')}'")
@@ -304,7 +352,7 @@ async def gerar_plano(usuario: str, pedido: str = "", progresso: Progresso = _na
     async def conferir_resposta(resposta) -> list[str]:
         await progresso(2)  # Calculando a cesta (em código)
         try:
-            plano = ler_json(resposta.texto)
+            plano = expandir(ler_json(resposta.texto))
             calc = cesta.calcular(plano, despensa)
         except (json.JSONDecodeError, TypeError, KeyError, ValueError) as erro:
             conferidos[id(resposta)] = (None, None, [f"JSON inválido ({erro})"], [])
@@ -381,7 +429,7 @@ async def trocar_prato(usuario: str, dia: str, tipo: str, pedido: str = "") -> d
     sobra_antiga = (antigo.get("sobra_planejada") or "").strip()
     manter_sobra = ([f"IMPORTANTE: o prato antigo deixava esta sobra planejada, que outras refeições usam: "
                      f"'{sobra_antiga}'. O prato novo precisa deixar a MESMA sobra (mesmo ingrediente extra) "
-                     f"e dizer isso em sobra_planejada."] if sobra_util(sobra_antiga) else [])
+                     f"e dizer isso em \"sobra\"."] if sobra_util(sobra_antiga) else [])
     briefing = "\n".join(_linhas_perfil(perfil) + [
         f"Troque SÓ esta refeição: {NOME_REFEICAO[tipo]} de {NOME_DIA[dia]} ({dia}/{tipo}), hoje '{antigo['prato']}'.",
         f"Pedido da pessoa: {pedido or 'quero outro prato'}.",
@@ -399,13 +447,16 @@ async def trocar_prato(usuario: str, dia: str, tipo: str, pedido: str = "") -> d
     def conferir_troca(resposta) -> list[str]:
         try:
             dados = ler_json(resposta.texto)
-            novo = dados["refeicao"]
-            novo["dia"], novo["tipo"] = dia, tipo  # a troca é sempre deste horário
             plano_novo = copy.deepcopy(atual)
-            plano_novo["refeicoes"][i] = novo
             existentes = {cesta.chave(p["item"]) for p in plano_novo["produtos"]}
-            plano_novo["produtos"] += [p for p in dados.get("produtos_novos", [])
-                                       if cesta.chave(p["item"]) not in existentes]
+            plano_novo["produtos"] += [produto_de_compra(c) for c in dados.get("compras_novas", [])
+                                       if cesta.chave(c["item"]) not in existentes]
+            unidades = {}
+            for p in plano_novo["produtos"]:
+                unidades.setdefault(cesta.chave(p["item"]), p["unidade"])
+            # a troca é sempre deste horário
+            novo = refeicoes_de({**dados["refeicao"], "dias": [dia], "tipo": tipo}, unidades)[0]
+            plano_novo["refeicoes"][i] = novo
             calc_novo = cesta.calcular(plano_novo, atual.get("despensa_inicial") or {})
         except (json.JSONDecodeError, KeyError, TypeError, ValueError) as erro:
             return [f"JSON inválido ({erro})"]

@@ -86,48 +86,65 @@ com gentileza para escolher nos botões ou responder de novo.
 # =============================================================================
 PLANO = """\
 Você monta o plano de refeições da semana para uma família brasileira e a lista de \
-compras por EMBALAGEM, dentro do orçamento. Responda só com o JSON pedido.
+compras por EMBALAGEM, dentro do orçamento. Responda só com o JSON pedido, compacto: \
+sem modo de preparo (a receita é escrita depois, quando a pessoa abrir o prato) e sem \
+explicações.
 
 Comida brasileira de verdade, do dia a dia: arroz e feijão, PF, marmita, ovo, frango, \
 carne moída, macarrão, legumes da época, cuscuz, tapioca, sopas, farofa, escondidinho, \
 e comida goiana quando combinar (arroz com pequi, empadão goiano, pamonha, galinhada). \
 Café da manhã e lanche simples (pão, ovo, cuscuz, tapioca, fruta, café, leite).
 
+Formato:
+- refeicoes: uma entrada por prato. "dias" são os dias em que esse prato é servido \
+naquele "tipo". Almoço e jantar: um dia por entrada. Café da manhã, lanche e marmita \
+podem repetir o mesmo prato em vários dias: use UMA entrada com todos esses dias (2 ou \
+3 opções de café na semana bastam).
+- "min": tempo total realista. "equip": códigos dos equipamentos que o prato usa.
+- "ingr": quanto o prato usa EM CADA DIA para a família toda (porções informadas; \
+criança = meia porção). "qtd" vai na MESMA unidade da embalagem do item em "compras" \
+(g, ml ou un).
+- "sobra": "" quando o prato não deixa sobra para outra refeição. Se deixa, diga em \
+poucas palavras o que sobra e onde vai ("feijão extra vira tropeiro na qua").
+- compras: uma entrada para CADA item usado em "ingr", com o MESMO texto em "item" \
+(nome curto e simples: "arroz", "feijão carioca", "frango coxa"). "emb": embalagem real \
+("pacote 5 kg", "bandeja 30 ovos", "garrafa 900 ml", "maço", "kg a granel"); "tam": o \
+tamanho dela na unidade "un" (5000 g, 30 un, 900 ml); "preco": preço realista da \
+embalagem INTEIRA nos mercados da pessoa; "promo": id da promoção usada, ou 0. Nunca \
+"350 g de arroz": quem compra é a embalagem.
+- "secao": alho, cebola e cheiro-verde vão em Hortifrúti; "Temperos e outros" é para \
+sal, especiarias, molhos e condimentos secos.
+
 Regras (o sistema confere tudo em código e devolve o plano se algo falhar):
-1. Planeje EXATAMENTE as refeições pedidas (dia + tipo), uma vez cada.
+1. Planeje EXATAMENTE as refeições pedidas (dia + tipo), cada uma uma vez.
 2. Restrições e alergias: NUNCA use ingrediente proibido, nem em nome de prato. Na \
 dúvida, não use. Para lactose prefira versões "sem lactose" escritas assim.
-3. Use só os equipamentos da cozinha da pessoa (campo equipamentos de cada refeição).
+3. Use só os equipamentos da cozinha da pessoa.
 4. Variedade: o mesmo prato no máximo 1 vez por semana no almoço/jantar; evite os \
 pratos da semana passada, salvo os favoritos; nunca use os rejeitados.
 5. Sobras planejadas: aproveite de um dia para o outro (o feijão de segunda vira \
-tropeiro na quarta; o frango assado vira recheio de tapioca) e explique em \
-sobra_planejada e em reaproveitamento. Marmita pode ser a sobra planejada do jantar. \
-Quando a refeição não deixa sobra para outra, sobra_planejada fica vazio ("").
-6. Quantidades: em cada refeição, "ingredientes" traz quanto AQUELE prato usa para a \
-família toda (porções informadas; criança = meia porção), em g, ml ou un.
-7. Produtos: para CADA item usado nos ingredientes, um produto com o MESMO texto em \
-"item" e a MESMA unidade, que existe no mercado: embalagem real ("pacote 5 kg", \
-"bandeja com 30 ovos", "garrafa 900 ml", "maço", "kg a granel"), tamanho na mesma \
-unidade (5000 g, 30 un, 900 ml) e preço realista da embalagem inteira nos mercados \
-da pessoa. Nunca "350 g de arroz": quem compra é a embalagem. Marque perecivel \
-(hortifrúti, carnes, laticínios, pão = true; grãos, óleo, sal, açúcar, café, farinha, \
-enlatados = false).
-8. Use primeiro o que já está na despensa. Use promoções quando fizer sentido, com o \
-preço exato da promoção para aquela embalagem e o id em promocao_id (0 se não for promoção).
-9. O total (soma das embalagens) precisa caber no orçamento da semana. Se apertar, \
-troque por proteínas mais baratas (ovo, frango, carne moída), mais feijão e legumes da época.
-10. tempo_min realista. Vibe da pessoa manda no estilo (rápido, uma panela só, \
-cozinhar no domingo, comida de vó, leve, fitness com mais proteína).
+tropeiro na quarta; o frango assado vira recheio de tapioca). Marmita pode ser a sobra \
+planejada do jantar.
+6. Use primeiro o que já está na despensa (o item entra em "compras" do mesmo jeito: o \
+sistema desconta o que a pessoa já tem). Use promoções quando fizer sentido, com o \
+preço exato da promoção para aquela embalagem.
+7. Orçamento: o sistema soma as embalagens em código, então não precisa fazer a conta \
+exata. Mire entre 85% e 95% do orçamento da semana. Se apertar, prefira proteínas mais \
+baratas (ovo, frango, carne moída), mais feijão e legumes da época.
+8. A vibe da pessoa manda no estilo (rápido, uma panela só, cozinhar no domingo, comida \
+de vó, leve, fitness com mais proteína).
 """
 
 TROCA = """\
-Você troca UMA refeição do plano da semana de uma família brasileira. Responda só \
-com o JSON pedido: a refeição nova e, se precisar, produtos novos (embalagens reais, \
-com preço da embalagem inteira, mesmo texto de "item" e mesma unidade dos \
-ingredientes). Reaproveite os produtos que já estão na lista sempre que der. Respeite \
-as restrições (nunca use ingrediente proibido), a cozinha da pessoa, não repita pratos \
-da semana e caiba no orçamento. Ingredientes na quantidade para a família toda.
+Você troca UMA refeição do plano da semana de uma família brasileira. Responda só com \
+o JSON pedido, compacto e sem modo de preparo: a refeição nova em "refeicao" (prato, \
+min, equip, ingr com item e qtd, sobra) e, só se precisar, embalagens novas em \
+"compras_novas" (item, emb, tam, un, preco da embalagem inteira, secao, promo). Em \
+"ingr", "qtd" é quanto o prato usa para a família toda, na unidade da embalagem do \
+item. Reaproveite os produtos que já estão na lista (mesmo texto em "item") e as sobras \
+das embalagens já compradas sempre que der. Respeite as restrições (nunca use \
+ingrediente proibido), a cozinha da pessoa, não repita pratos da semana e caiba no \
+orçamento.
 """
 
 RECEITA = """\

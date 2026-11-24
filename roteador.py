@@ -151,9 +151,25 @@ def _registrar(nivel: Nivel, tarefa: str, motivo: str, resposta: RespostaIA | No
              r.cache_escrita, custo, "" if resposta else " (falhou)")
 
 
+ESFORCOS = ("low", "medium", "high")
+
+
+def esforco(nivel: Nivel, tarefa: str) -> str | None:
+    """Effort do Claude por tarefa (o Gemini não usa). O cardápio no Sonnet usa ESFORCO_CARDAPIO
+    (padrão "low", decisão de 24/11 para o custo ficar abaixo de US$ 0,08: o raciocínio é cobrado
+    como saída e era ~5 mil dos 12 mil tokens). Quando o Opus refaz um cardápio reprovado, ele
+    pensa mais ("medium")."""
+    if nivel.provedor != "claude":
+        return None
+    if tarefa == "cardapio" and nivel.nome == "sonnet":
+        escolhido = (os.getenv("ESFORCO_CARDAPIO") or "low").strip().lower()
+        return escolhido if escolhido in ESFORCOS else "low"
+    return "medium" if tarefa in TAREFAS_ESFORCO_MEDIO else "low"
+
+
 async def _chamar(nivel: Nivel, tarefa: str, **kwargs) -> RespostaIA:
-    esforco = ("medium" if tarefa in TAREFAS_ESFORCO_MEDIO else "low") if nivel.provedor == "claude" else None
-    resposta = await ADAPTADORES[nivel.provedor].gerar(modelo=nivel.modelo, esforco=esforco, **kwargs)
+    resposta = await ADAPTADORES[nivel.provedor].gerar(modelo=nivel.modelo, esforco=esforco(nivel, tarefa),
+                                                        **kwargs)
     resposta.nivel = nivel.nome
     return resposta
 

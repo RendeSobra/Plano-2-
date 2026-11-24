@@ -1,0 +1,1131 @@
+{
+ "origem": "Plano real de 23/11/2026 (Opus, depois de reprovar o Sonnet), só pratos e compras, sem dados pessoais.",
+ "refeicoes": [
+  {
+   "dia": "seg",
+   "tipo": "cafe",
+   "prato": "Cuscuz com ovo mexido e café",
+   "tempo_min": 15,
+   "equipamentos": [
+    "fogao"
+   ],
+   "ingredientes": [
+    {
+     "item": "Flocão de milho",
+     "quantidade": 200,
+     "unidade": "g"
+    },
+    {
+     "item": "Ovo",
+     "quantidade": 4,
+     "unidade": "un"
+    },
+    {
+     "item": "Café",
+     "quantidade": 40,
+     "unidade": "g"
+    },
+    {
+     "item": "Açúcar",
+     "quantidade": 25,
+     "unidade": "g"
+    },
+    {
+     "item": "Sal",
+     "quantidade": 5,
+     "unidade": "g"
+    }
+   ],
+   "sobra_planejada": "Sem sobra."
+  },
+  {
+   "dia": "seg",
+   "tipo": "almoco",
+   "prato": "Frango na pressão com molho de tomate, arroz e feijão",
+   "tempo_min": 45,
+   "equipamentos": [
+    "fogao",
+    "pressao"
+   ],
+   "ingredientes": [
+    {
+     "item": "Frango coxa e sobrecoxa",
+     "quantidade": 800,
+     "unidade": "g"
+    },
+    {
+     "item": "Arroz",
+     "quantidade": 300,
+     "unidade": "g"
+    },
+    {
+     "item": "Feijão carioca",
+     "quantidade": 200,
+     "unidade": "g"
+    },
+    {
+     "item": "Cebola",
+     "quantidade": 150,
+     "unidade": "g"
+    },
+    {
+     "item": "Tomate",
+     "quantidade": 200,
+     "unidade": "g"
+    },
+    {
+     "item": "Alho",
+     "quantidade": 10,
+     "unidade": "g"
+    },
+    {
+     "item": "Colorau",
+     "quantidade": 5,
+     "unidade": "g"
+    },
+    {
+     "item": "Óleo de soja",
+     "quantidade": 30,
+     "unidade": "ml"
+    },
+    {
+     "item": "Sal",
+     "quantidade": 15,
+     "unidade": "g"
+    }
+   ],
+   "sobra_planejada": "Sem sobra planejada, porções feitas para a família toda"
+  },
+  {
+   "dia": "seg",
+   "tipo": "jantar",
+   "prato": "Sopa de mandioca com frango desfiado",
+   "tempo_min": 35,
+   "equipamentos": [
+    "fogao",
+    "pressao"
+   ],
+   "ingredientes": [
+    {
+     "item": "Mandioca",
+     "quantidade": 500,
+     "unidade": "g"
+    },
+    {
+     "item": "Cenoura",
+     "quantidade": 200,
+     "unidade": "g"
+    },
+    {
+     "item": "Frango coxa e sobrecoxa",
+     "quantidade": 300,
+     "unidade": "g"
+    },
+    {
+     "item": "Cebola",
+     "quantidade": 100,
+     "unidade": "g"
+    },
+    {
+     "item": "Alho",
+     "quantidade": 10,
+     "unidade": "g"
+    },
+    {
+     "item": "Sal",
+     "quantidade": 8,
+     "unidade": "g"
+    }
+   ],
+   "sobra_planejada": "Usa o frango extra cozido no almoço."
+  },
+  {
+   "dia": "ter",
+   "tipo": "cafe",
+   "prato": "Tapioca com banana e café",
+   "tempo_min": 15,
+   "equipamentos": [
+    "fogao"
+   ],
+   "ingredientes": [
+    {
+     "item": "Goma de tapioca",
+     "quantidade": 200,
+     "unidade": "g"
+    },
+    {
+     "item": "Banana",
+     "quantidade": 500,
+     "unidade": "g"
+    },
+    {
+     "item": "Café",
+     "quantidade": 40,
+     "unidade": "g"
+    },
+    {
+     "item": "Açúcar",
+     "quantidade": 25,
+     "unidade": "g"
+    }
+   ],
+   "sobra_planejada": "Sem sobra."
+  },
+  {
+   "dia": "ter",
+   "tipo": "almoco",
+   "prato": "Macarrão com carne moída",
+   "tempo_min": 35,
+   "equipamentos": [
+    "fogao"
+   ],
+   "ingredientes": [
+    {
+     "item": "Macarrão espaguete",
+     "quantidade": 400,
+     "unidade": "g"
+    },
+    {
+     "item": "Carne moída",
+     "quantidade": 500,
+     "unidade": "g"
+    },
+    {
+     "item": "Tomate",
+     "quantidade": 500,
+     "unidade": "g"
+    },
+    {
+     "item": "Cebola",
+     "quantidade": 150,
+     "unidade": "g"
+    },
+    {
+     "item": "Alho",
+     "quantidade": 15,
+     "unidade": "g"
+    },
+    {
+     "item": "Óleo de soja",
+     "quantidade": 30,
+     "unidade": "ml"
+    },
+    {
+     "item": "Sal",
+     "quantidade": 10,
+     "unidade": "g"
+    }
+   ],
+   "sobra_planejada": "Sem sobra."
+  },
+  {
+   "dia": "ter",
+   "tipo": "jantar",
+   "prato": "Arroz com cenoura e ovos mexidos com tomate e cebola",
+   "tempo_min": 25,
+   "equipamentos": [
+    "fogao"
+   ],
+   "ingredientes": [
+    {
+     "item": "Arroz",
+     "quantidade": 200,
+     "unidade": "g"
+    },
+    {
+     "item": "Ovo",
+     "quantidade": 6,
+     "unidade": "un"
+    },
+    {
+     "item": "Cenoura",
+     "quantidade": 150,
+     "unidade": "g"
+    },
+    {
+     "item": "Cebola",
+     "quantidade": 100,
+     "unidade": "g"
+    },
+    {
+     "item": "Tomate",
+     "quantidade": 150,
+     "unidade": "g"
+    },
+    {
+     "item": "Alho",
+     "quantidade": 8,
+     "unidade": "g"
+    },
+    {
+     "item": "Óleo de soja",
+     "quantidade": 30,
+     "unidade": "ml"
+    },
+    {
+     "item": "Sal",
+     "quantidade": 5,
+     "unidade": "g"
+    }
+   ],
+   "sobra_planejada": "Sem sobra planejada."
+  },
+  {
+   "dia": "qua",
+   "tipo": "cafe",
+   "prato": "Cuscuz com ovo mexido e café",
+   "tempo_min": 15,
+   "equipamentos": [
+    "fogao"
+   ],
+   "ingredientes": [
+    {
+     "item": "Flocão de milho",
+     "quantidade": 200,
+     "unidade": "g"
+    },
+    {
+     "item": "Ovo",
+     "quantidade": 4,
+     "unidade": "un"
+    },
+    {
+     "item": "Café",
+     "quantidade": 40,
+     "unidade": "g"
+    },
+    {
+     "item": "Açúcar",
+     "quantidade": 25,
+     "unidade": "g"
+    },
+    {
+     "item": "Sal",
+     "quantidade": 5,
+     "unidade": "g"
+    }
+   ],
+   "sobra_planejada": "Sem sobra."
+  },
+  {
+   "dia": "qua",
+   "tipo": "almoco",
+   "prato": "Arroz e picadinho de carne moída com batata",
+   "tempo_min": 40,
+   "equipamentos": [
+    "fogao",
+    "pressao"
+   ],
+   "ingredientes": [
+    {
+     "item": "Arroz",
+     "quantidade": 250,
+     "unidade": "g"
+    },
+    {
+     "item": "Carne moída",
+     "quantidade": 500,
+     "unidade": "g"
+    },
+    {
+     "item": "Batata",
+     "quantidade": 600,
+     "unidade": "g"
+    },
+    {
+     "item": "Cebola",
+     "quantidade": 150,
+     "unidade": "g"
+    },
+    {
+     "item": "Alho",
+     "quantidade": 10,
+     "unidade": "g"
+    },
+    {
+     "item": "Óleo de soja",
+     "quantidade": 30,
+     "unidade": "ml"
+    },
+    {
+     "item": "Sal",
+     "quantidade": 10,
+     "unidade": "g"
+    }
+   ],
+   "sobra_planejada": "Sem sobra."
+  },
+  {
+   "dia": "qua",
+   "tipo": "jantar",
+   "prato": "Tropeiro de feijão da segunda",
+   "tempo_min": 25,
+   "equipamentos": [
+    "fogao"
+   ],
+   "ingredientes": [
+    {
+     "item": "Ovo",
+     "quantidade": 4,
+     "unidade": "un"
+    },
+    {
+     "item": "Couve",
+     "quantidade": 1,
+     "unidade": "un"
+    },
+    {
+     "item": "Farinha de mandioca",
+     "quantidade": 100,
+     "unidade": "g"
+    },
+    {
+     "item": "Cebola",
+     "quantidade": 100,
+     "unidade": "g"
+    },
+    {
+     "item": "Alho",
+     "quantidade": 10,
+     "unidade": "g"
+    },
+    {
+     "item": "Óleo de soja",
+     "quantidade": 30,
+     "unidade": "ml"
+    }
+   ],
+   "sobra_planejada": "Usa o feijão cozido que sobrou de segunda (já contado na compra de segunda)."
+  },
+  {
+   "dia": "qui",
+   "tipo": "cafe",
+   "prato": "Tapioca com ovo e café",
+   "tempo_min": 15,
+   "equipamentos": [
+    "fogao"
+   ],
+   "ingredientes": [
+    {
+     "item": "Goma de tapioca",
+     "quantidade": 200,
+     "unidade": "g"
+    },
+    {
+     "item": "Ovo",
+     "quantidade": 4,
+     "unidade": "un"
+    },
+    {
+     "item": "Café",
+     "quantidade": 40,
+     "unidade": "g"
+    },
+    {
+     "item": "Açúcar",
+     "quantidade": 25,
+     "unidade": "g"
+    }
+   ],
+   "sobra_planejada": "Sem sobra."
+  },
+  {
+   "dia": "qui",
+   "tipo": "almoco",
+   "prato": "Arroz, feijão e abóbora refogada",
+   "tempo_min": 45,
+   "equipamentos": [
+    "fogao",
+    "pressao"
+   ],
+   "ingredientes": [
+    {
+     "item": "Arroz",
+     "quantidade": 250,
+     "unidade": "g"
+    },
+    {
+     "item": "Feijão carioca",
+     "quantidade": 250,
+     "unidade": "g"
+    },
+    {
+     "item": "Abóbora",
+     "quantidade": 600,
+     "unidade": "g"
+    },
+    {
+     "item": "Alho",
+     "quantidade": 15,
+     "unidade": "g"
+    },
+    {
+     "item": "Óleo de soja",
+     "quantidade": 30,
+     "unidade": "ml"
+    },
+    {
+     "item": "Sal",
+     "quantidade": 10,
+     "unidade": "g"
+    }
+   ],
+   "sobra_planejada": "Sobra abóbora crua para a sopa do jantar."
+  },
+  {
+   "dia": "qui",
+   "tipo": "jantar",
+   "prato": "Sopa de legumes com macarrão",
+   "tempo_min": 30,
+   "equipamentos": [
+    "fogao",
+    "pressao"
+   ],
+   "ingredientes": [
+    {
+     "item": "Macarrão espaguete",
+     "quantidade": 200,
+     "unidade": "g"
+    },
+    {
+     "item": "Batata",
+     "quantidade": 300,
+     "unidade": "g"
+    },
+    {
+     "item": "Cenoura",
+     "quantidade": 200,
+     "unidade": "g"
+    },
+    {
+     "item": "Abóbora",
+     "quantidade": 300,
+     "unidade": "g"
+    },
+    {
+     "item": "Alho",
+     "quantidade": 10,
+     "unidade": "g"
+    },
+    {
+     "item": "Sal",
+     "quantidade": 8,
+     "unidade": "g"
+    }
+   ],
+   "sobra_planejada": "Sem sobra."
+  },
+  {
+   "dia": "sex",
+   "tipo": "cafe",
+   "prato": "Cuscuz com banana e café",
+   "tempo_min": 15,
+   "equipamentos": [
+    "fogao"
+   ],
+   "ingredientes": [
+    {
+     "item": "Flocão de milho",
+     "quantidade": 200,
+     "unidade": "g"
+    },
+    {
+     "item": "Banana",
+     "quantidade": 500,
+     "unidade": "g"
+    },
+    {
+     "item": "Café",
+     "quantidade": 40,
+     "unidade": "g"
+    },
+    {
+     "item": "Açúcar",
+     "quantidade": 25,
+     "unidade": "g"
+    },
+    {
+     "item": "Sal",
+     "quantidade": 5,
+     "unidade": "g"
+    }
+   ],
+   "sobra_planejada": "Sem sobra."
+  },
+  {
+   "dia": "sex",
+   "tipo": "almoco",
+   "prato": "Arroz, feijão, ovo frito e couve",
+   "tempo_min": 45,
+   "equipamentos": [
+    "fogao",
+    "pressao"
+   ],
+   "ingredientes": [
+    {
+     "item": "Arroz",
+     "quantidade": 250,
+     "unidade": "g"
+    },
+    {
+     "item": "Feijão carioca",
+     "quantidade": 350,
+     "unidade": "g"
+    },
+    {
+     "item": "Ovo",
+     "quantidade": 4,
+     "unidade": "un"
+    },
+    {
+     "item": "Couve",
+     "quantidade": 1,
+     "unidade": "un"
+    },
+    {
+     "item": "Alho",
+     "quantidade": 15,
+     "unidade": "g"
+    },
+    {
+     "item": "Óleo de soja",
+     "quantidade": 50,
+     "unidade": "ml"
+    },
+    {
+     "item": "Sal",
+     "quantidade": 10,
+     "unidade": "g"
+    }
+   ],
+   "sobra_planejada": "Feijão extra para a sopa de feijão do jantar."
+  },
+  {
+   "dia": "sex",
+   "tipo": "jantar",
+   "prato": "Sopa de feijão com macarrão",
+   "tempo_min": 25,
+   "equipamentos": [
+    "fogao"
+   ],
+   "ingredientes": [
+    {
+     "item": "Macarrão espaguete",
+     "quantidade": 150,
+     "unidade": "g"
+    },
+    {
+     "item": "Cenoura",
+     "quantidade": 150,
+     "unidade": "g"
+    },
+    {
+     "item": "Cebola",
+     "quantidade": 80,
+     "unidade": "g"
+    },
+    {
+     "item": "Sal",
+     "quantidade": 8,
+     "unidade": "g"
+    }
+   ],
+   "sobra_planejada": "Usa o caldo e feijão que sobraram do almoço."
+  },
+  {
+   "dia": "sab",
+   "tipo": "cafe",
+   "prato": "Farofa de ovo com café",
+   "tempo_min": 15,
+   "equipamentos": [
+    "fogao"
+   ],
+   "ingredientes": [
+    {
+     "item": "Ovo",
+     "quantidade": 4,
+     "unidade": "un"
+    },
+    {
+     "item": "Farinha de mandioca",
+     "quantidade": 60,
+     "unidade": "g"
+    },
+    {
+     "item": "Óleo de soja",
+     "quantidade": 20,
+     "unidade": "ml"
+    },
+    {
+     "item": "Café",
+     "quantidade": 40,
+     "unidade": "g"
+    },
+    {
+     "item": "Açúcar",
+     "quantidade": 25,
+     "unidade": "g"
+    }
+   ],
+   "sobra_planejada": "Sem sobra."
+  },
+  {
+   "dia": "sab",
+   "tipo": "almoco",
+   "prato": "Galinhada goiana",
+   "tempo_min": 50,
+   "equipamentos": [
+    "fogao",
+    "pressao"
+   ],
+   "ingredientes": [
+    {
+     "item": "Frango coxa e sobrecoxa",
+     "quantidade": 900,
+     "unidade": "g"
+    },
+    {
+     "item": "Arroz",
+     "quantidade": 500,
+     "unidade": "g"
+    },
+    {
+     "item": "Cebola",
+     "quantidade": 200,
+     "unidade": "g"
+    },
+    {
+     "item": "Alho",
+     "quantidade": 20,
+     "unidade": "g"
+    },
+    {
+     "item": "Colorau",
+     "quantidade": 10,
+     "unidade": "g"
+    },
+    {
+     "item": "Óleo de soja",
+     "quantidade": 40,
+     "unidade": "ml"
+    },
+    {
+     "item": "Sal",
+     "quantidade": 15,
+     "unidade": "g"
+    }
+   ],
+   "sobra_planejada": "Se sobrar galinhada, vira marmita/almoço extra no domingo."
+  },
+  {
+   "dia": "sab",
+   "tipo": "jantar",
+   "prato": "Mandioca cozida com ovo cozido e couve",
+   "tempo_min": 30,
+   "equipamentos": [
+    "fogao",
+    "pressao"
+   ],
+   "ingredientes": [
+    {
+     "item": "Mandioca",
+     "quantidade": 600,
+     "unidade": "g"
+    },
+    {
+     "item": "Ovo",
+     "quantidade": 4,
+     "unidade": "un"
+    },
+    {
+     "item": "Couve",
+     "quantidade": 1,
+     "unidade": "un"
+    },
+    {
+     "item": "Alho",
+     "quantidade": 10,
+     "unidade": "g"
+    },
+    {
+     "item": "Óleo de soja",
+     "quantidade": 20,
+     "unidade": "ml"
+    },
+    {
+     "item": "Sal",
+     "quantidade": 8,
+     "unidade": "g"
+    }
+   ],
+   "sobra_planejada": "Sem sobra."
+  },
+  {
+   "dia": "dom",
+   "tipo": "cafe",
+   "prato": "Tapioca com banana e café",
+   "tempo_min": 15,
+   "equipamentos": [
+    "fogao"
+   ],
+   "ingredientes": [
+    {
+     "item": "Goma de tapioca",
+     "quantidade": 200,
+     "unidade": "g"
+    },
+    {
+     "item": "Banana",
+     "quantidade": 500,
+     "unidade": "g"
+    },
+    {
+     "item": "Café",
+     "quantidade": 40,
+     "unidade": "g"
+    },
+    {
+     "item": "Açúcar",
+     "quantidade": 25,
+     "unidade": "g"
+    }
+   ],
+   "sobra_planejada": "Sem sobra."
+  },
+  {
+   "dia": "dom",
+   "tipo": "almoco",
+   "prato": "Arroz, feijão, batata refogada no óleo e ovo frito",
+   "tempo_min": 45,
+   "equipamentos": [
+    "fogao",
+    "pressao"
+   ],
+   "ingredientes": [
+    {
+     "item": "Arroz",
+     "quantidade": 250,
+     "unidade": "g"
+    },
+    {
+     "item": "Feijão carioca",
+     "quantidade": 250,
+     "unidade": "g"
+    },
+    {
+     "item": "Batata",
+     "quantidade": 600,
+     "unidade": "g"
+    },
+    {
+     "item": "Ovo",
+     "quantidade": 4,
+     "unidade": "un"
+    },
+    {
+     "item": "Alho",
+     "quantidade": 15,
+     "unidade": "g"
+    },
+    {
+     "item": "Óleo de soja",
+     "quantidade": 50,
+     "unidade": "ml"
+    },
+    {
+     "item": "Sal",
+     "quantidade": 10,
+     "unidade": "g"
+    }
+   ],
+   "sobra_planejada": "Sem sobra."
+  },
+  {
+   "dia": "dom",
+   "tipo": "jantar",
+   "prato": "Macarrão alho e óleo",
+   "tempo_min": 20,
+   "equipamentos": [
+    "fogao"
+   ],
+   "ingredientes": [
+    {
+     "item": "Macarrão espaguete",
+     "quantidade": 400,
+     "unidade": "g"
+    },
+    {
+     "item": "Alho",
+     "quantidade": 30,
+     "unidade": "g"
+    },
+    {
+     "item": "Óleo de soja",
+     "quantidade": 60,
+     "unidade": "ml"
+    },
+    {
+     "item": "Sal",
+     "quantidade": 10,
+     "unidade": "g"
+    }
+   ],
+   "sobra_planejada": "Sem sobra."
+  }
+ ],
+ "produtos": [
+  {
+   "item": "Arroz",
+   "nome": "Arroz branco tipo 1",
+   "embalagem": "pacote 5 kg",
+   "tamanho": 5000,
+   "unidade": "g",
+   "preco": 25,
+   "secao": "Mercearia",
+   "perecivel": false,
+   "promocao_id": 0
+  },
+  {
+   "item": "Feijão carioca",
+   "nome": "Feijão carioca tipo 1",
+   "embalagem": "pacote 1 kg",
+   "tamanho": 1000,
+   "unidade": "g",
+   "preco": 7.5,
+   "secao": "Mercearia",
+   "perecivel": false,
+   "promocao_id": 0
+  },
+  {
+   "item": "Óleo de soja",
+   "nome": "Óleo de soja",
+   "embalagem": "garrafa 900 ml",
+   "tamanho": 900,
+   "unidade": "ml",
+   "preco": 8,
+   "secao": "Mercearia",
+   "perecivel": false,
+   "promocao_id": 0
+  },
+  {
+   "item": "Sal",
+   "nome": "Sal refinado",
+   "embalagem": "pacote 1 kg",
+   "tamanho": 1000,
+   "unidade": "g",
+   "preco": 3,
+   "secao": "Temperos e outros",
+   "perecivel": false,
+   "promocao_id": 0
+  },
+  {
+   "item": "Alho",
+   "nome": "Alho",
+   "embalagem": "pacote 250 g",
+   "tamanho": 250,
+   "unidade": "g",
+   "preco": 8,
+   "secao": "Hortifrúti",
+   "perecivel": true,
+   "promocao_id": 0
+  },
+  {
+   "item": "Cebola",
+   "nome": "Cebola",
+   "embalagem": "kg a granel",
+   "tamanho": 1000,
+   "unidade": "g",
+   "preco": 5,
+   "secao": "Hortifrúti",
+   "perecivel": true,
+   "promocao_id": 0
+  },
+  {
+   "item": "Tomate",
+   "nome": "Tomate",
+   "embalagem": "kg a granel",
+   "tamanho": 1000,
+   "unidade": "g",
+   "preco": 7,
+   "secao": "Hortifrúti",
+   "perecivel": true,
+   "promocao_id": 0
+  },
+  {
+   "item": "Ovo",
+   "nome": "Ovos brancos",
+   "embalagem": "bandeja com 30 ovos",
+   "tamanho": 30,
+   "unidade": "un",
+   "preco": 20,
+   "secao": "Ovos e laticínios",
+   "perecivel": true,
+   "promocao_id": 0
+  },
+  {
+   "item": "Flocão de milho",
+   "nome": "Flocão de milho",
+   "embalagem": "pacote 500 g",
+   "tamanho": 500,
+   "unidade": "g",
+   "preco": 3.5,
+   "secao": "Mercearia",
+   "perecivel": false,
+   "promocao_id": 0
+  },
+  {
+   "item": "Goma de tapioca",
+   "nome": "Goma de tapioca hidratada",
+   "embalagem": "pacote 500 g",
+   "tamanho": 500,
+   "unidade": "g",
+   "preco": 7,
+   "secao": "Mercearia",
+   "perecivel": false,
+   "promocao_id": 0
+  },
+  {
+   "item": "Café",
+   "nome": "Café torrado e moído",
+   "embalagem": "pacote 500 g",
+   "tamanho": 500,
+   "unidade": "g",
+   "preco": 18,
+   "secao": "Mercearia",
+   "perecivel": false,
+   "promocao_id": 0
+  },
+  {
+   "item": "Açúcar",
+   "nome": "Açúcar refinado",
+   "embalagem": "pacote 1 kg",
+   "tamanho": 1000,
+   "unidade": "g",
+   "preco": 5,
+   "secao": "Mercearia",
+   "perecivel": false,
+   "promocao_id": 0
+  },
+  {
+   "item": "Banana",
+   "nome": "Banana prata",
+   "embalagem": "kg a granel",
+   "tamanho": 1000,
+   "unidade": "g",
+   "preco": 6,
+   "secao": "Hortifrúti",
+   "perecivel": true,
+   "promocao_id": 0
+  },
+  {
+   "item": "Frango coxa e sobrecoxa",
+   "nome": "Coxa e sobrecoxa de frango",
+   "embalagem": "pacote 2 kg",
+   "tamanho": 2000,
+   "unidade": "g",
+   "preco": 22,
+   "secao": "Açougue e aves",
+   "perecivel": true,
+   "promocao_id": 0
+  },
+  {
+   "item": "Carne moída",
+   "nome": "Carne moída bovina",
+   "embalagem": "bandeja 1 kg",
+   "tamanho": 1000,
+   "unidade": "g",
+   "preco": 32,
+   "secao": "Açougue e aves",
+   "perecivel": true,
+   "promocao_id": 0
+  },
+  {
+   "item": "Macarrão espaguete",
+   "nome": "Macarrão espaguete",
+   "embalagem": "pacote 500 g",
+   "tamanho": 500,
+   "unidade": "g",
+   "preco": 4.5,
+   "secao": "Mercearia",
+   "perecivel": false,
+   "promocao_id": 0
+  },
+  {
+   "item": "Batata",
+   "nome": "Batata inglesa",
+   "embalagem": "saco 2 kg",
+   "tamanho": 2000,
+   "unidade": "g",
+   "preco": 12,
+   "secao": "Hortifrúti",
+   "perecivel": true,
+   "promocao_id": 0
+  },
+  {
+   "item": "Cenoura",
+   "nome": "Cenoura",
+   "embalagem": "saco 1 kg",
+   "tamanho": 1000,
+   "unidade": "g",
+   "preco": 5,
+   "secao": "Hortifrúti",
+   "perecivel": true,
+   "promocao_id": 0
+  },
+  {
+   "item": "Abóbora",
+   "nome": "Abóbora cabotiá",
+   "embalagem": "kg a granel",
+   "tamanho": 1000,
+   "unidade": "g",
+   "preco": 5,
+   "secao": "Hortifrúti",
+   "perecivel": true,
+   "promocao_id": 0
+  },
+  {
+   "item": "Mandioca",
+   "nome": "Mandioca descascada",
+   "embalagem": "saco 2 kg",
+   "tamanho": 2000,
+   "unidade": "g",
+   "preco": 10,
+   "secao": "Hortifrúti",
+   "perecivel": true,
+   "promocao_id": 0
+  },
+  {
+   "item": "Couve",
+   "nome": "Couve folha",
+   "embalagem": "maço",
+   "tamanho": 1,
+   "unidade": "un",
+   "preco": 3.5,
+   "secao": "Hortifrúti",
+   "perecivel": true,
+   "promocao_id": 0
+  },
+  {
+   "item": "Farinha de mandioca",
+   "nome": "Farinha de mandioca torrada",
+   "embalagem": "pacote 500 g",
+   "tamanho": 500,
+   "unidade": "g",
+   "preco": 6,
+   "secao": "Mercearia",
+   "perecivel": false,
+   "promocao_id": 0
+  },
+  {
+   "item": "Colorau",
+   "nome": "Colorau",
+   "embalagem": "pacote 100 g",
+   "tamanho": 100,
+   "unidade": "g",
+   "preco": 3,
+   "secao": "Temperos e outros",
+   "perecivel": false,
+   "promocao_id": 0
+  }
+ ]
+}

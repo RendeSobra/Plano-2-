@@ -131,6 +131,28 @@ def produto(item, embalagem, tamanho, unidade, preco, secao, perecivel, promocao
             "preco": preco, "secao": secao, "perecivel": perecivel, "promocao_id": promocao_id}
 
 
+def _prato_ia(r: dict) -> dict:
+    return {"prato": r["prato"], "min": r["tempo_min"], "equip": list(r["equipamentos"]),
+            "ingr": [{"item": i["item"], "qtd": i["quantidade"]} for i in r["ingredientes"]],
+            "sobra": r.get("sobra_planejada") or ""}
+
+
+def compra_ia(p: dict) -> dict:
+    return {"item": p["item"], "emb": p["embalagem"], "tam": p["tamanho"], "un": p["unidade"], "preco": p["preco"],
+            "secao": p["secao"], "promo": p.get("promocao_id", 0)}
+
+
+def para_ia(plano: dict) -> dict:
+    """Plano no formato interno -> resposta compacta, como a IA escreve (um dia por entrada)."""
+    return {"refeicoes": [{"dias": [r["dia"]], "tipo": r["tipo"], **_prato_ia(r)} for r in plano["refeicoes"]],
+            "compras": [compra_ia(p) for p in plano["produtos"]]}
+
+
+def troca_ia(ref: dict, compras_novas=()) -> dict:
+    """Resposta compacta de uma troca de prato."""
+    return {"refeicao": _prato_ia(ref), "compras_novas": [compra_ia(p) for p in compras_novas]}
+
+
 def plano_valido() -> dict:
     return {
         "refeicoes": [
@@ -286,7 +308,15 @@ ok(r.nivel == "gemini" and gemini.chamadas[-1]["esforco"] is None, "conversa com
 r = gerar("receita")
 ok(r.nivel == "gemini", "receita começa no Gemini")
 r = gerar("cardapio")
-ok(r.modelo == SONNET and claude.chamadas[-1]["esforco"] == "medium", "gerar cardápio começa no Sonnet (effort medium)")
+ok(r.modelo == SONNET and claude.chamadas[-1]["esforco"] == "low",
+   "gerar cardápio começa no Sonnet (effort low: o raciocínio é cobrado como saída)")
+os.environ["ESFORCO_CARDAPIO"] = "medium"
+gerar("cardapio")
+os.environ["ESFORCO_CARDAPIO"] = "altissimo"
+gerar("cardapio")
+os.environ.pop("ESFORCO_CARDAPIO")
+ok([c["esforco"] for c in claude.chamadas[-2:]] == ["medium", "low"],
+   "ESFORCO_CARDAPIO no .env muda o effort do Sonnet (valor inválido volta para low)")
 r = gerar("troca")
 ok(r.modelo == HAIKU and claude.chamadas[-1]["esforco"] == "medium", "trocar prato começa no Haiku (effort medium)")
 r = gerar("cardapio", complexo=True)
@@ -321,6 +351,8 @@ ok(modelos(claude) == [SONNET, OPUS] and r.modelo == OPUS and r.motivo.startswit
    "cardápio reprovado no Sonnet -> refeito UMA vez no Opus")
 ok("passou R$ 23,00 do orçamento" in claude.chamadas[1]["mensagens"][-1]["texto"]
    and claude.chamadas[1]["mensagens"][-2]["texto"] == "reprovado", "o Opus recebe a resposta reprovada e o motivo")
+ok([c["esforco"] for c in claude.chamadas] == ["low", "medium"],
+   "cardápio: Sonnet com effort low; o Opus refaz com effort medium")
 ok(banco.resumo_escalonamentos(banco.hoje()) == [{"motivo": "orçamento", "vezes": 1}], "subida registrada com o motivo (orçamento)")
 claude.chamadas.clear()
 claude.fila = ["r1", "r2", "aprovado"]
@@ -439,7 +471,7 @@ gemini, claude = instalar_ias()
 criar_usuario()
 com_lactose = plano_valido()
 com_lactose["refeicoes"][3]["prato"] = "Omelete com queijo"
-claude.fila = [com_lactose, plano_valido()]
+claude.fila = [para_ia(com_lactose), para_ia(plano_valido())]
 etapas: list[int] = []
 
 
@@ -454,10 +486,9 @@ ok(plano["nivel"] == "opus", "o plano guarda qual nível o fez")
 ok(etapas == [0, 1, 2, 3, 1, 2, 3, 4], f"a 'animação' acompanha as etapas reais, inclusive o ajuste ({etapas})")
 ok(plano["cesta"]["total"] == 133.90 and banco.plano_atual("u1")["id"] == plano["id"], "plano salvo com o total calculado em código")
 
-claude.fila = [{"refeicao": refeicao("ter", "jantar", "Omelete de forno", [("ovo", 6, "un")], ("forno",)),
-                "produtos_novos": []},
-               {"refeicao": refeicao("ter", "jantar", "Sopa de feijão com macarrão",
-                                     [("feijão", 200, "g"), ("macarrão", 100, "g")]), "produtos_novos": []}]
+claude.fila = [troca_ia(refeicao("ter", "jantar", "Omelete de forno", [("ovo", 6, "un")], ("forno",))),
+               troca_ia(refeicao("ter", "jantar", "Sopa de feijão com macarrão",
+                                 [("feijão", 200, "g"), ("macarrão", 100, "g")]))]
 claude.chamadas.clear()
 novo = asyncio.run(cardapio.trocar_prato("u1", "ter", "jantar", "algo de panela"))
 i = cardapio.indice(novo, "ter", "jantar")
@@ -467,7 +498,7 @@ ok(sum(1 for a, b in zip(plano["refeicoes"], novo["refeicoes"]) if a["prato"] !=
    "a troca muda só aquele prato")
 ok(novo["cesta"]["total"] <= novo["orcamento"] and novo["cesta"]["total"] != plano["cesta"]["total"],
    f"total recalculado e dentro do orçamento (R$ {novo['cesta']['total']:.2f})")
-claude.fila = [{"refeicao": refeicao("ter", "jantar", "Cuscuz com ovo mexido", [("ovo", 2, "un")]), "produtos_novos": []}] * 3
+claude.fila = [troca_ia(refeicao("ter", "jantar", "Cuscuz com ovo mexido", [("ovo", 2, "un")]))] * 3
 try:
     asyncio.run(cardapio.trocar_prato("u1", "ter", "jantar"))
     ok(False, "troca que repete prato da semana é recusada")
@@ -482,6 +513,60 @@ rec2 = asyncio.run(cardapio.receita("u1", "ter", "jantar"))
 ok(len(rec["passos"]) == 3 and rec2 == rec and len(gemini.chamadas) == 1, "receita gerada pelo Gemini uma vez e guardada no plano")
 cardapio.avaliar("u1", "Sopa de feijão com macarrão", 5)
 ok(cardapio.favoritos(banco.usuario("u1")) == ["Sopa de feijão com macarrão"], "nota 5 vira favorito no perfil")
+
+# =======================================================================================
+secao("Cardápio compacto: menos tokens, sem modo de preparo (custo, 24/11)")
+esquemas = json.dumps([cardapio.ESQUEMA_PLANO, cardapio.ESQUEMA_TROCA], ensure_ascii=False)
+ok(not any(p in esquemas for p in ('"passos"', "preparo", "reaproveitamento", '"nome"', '"perecivel"', '"unidade"')),
+   "o JSON do cardápio e da troca não pede modo de preparo, explicações nem campos que o código deduz")
+ok("sem modo de preparo" in cardapio.prompts.PLANO and "sem modo de preparo" in cardapio.prompts.TROCA,
+   "as instruções dizem que a receita só é escrita quando a pessoa abre o prato")
+compacto = {"refeicoes": [
+    {"dias": ["qua", "seg", "ter"], "tipo": "cafe", "prato": "Cuscuz com ovo", "min": 15, "equip": ["fogao"],
+     "ingr": [{"item": "flocão", "qtd": 200}, {"item": "Ovo", "qtd": 4}], "sobra": ""},
+    {"dias": ["seg"], "tipo": "almoco", "prato": "Arroz, feijão e frango", "min": 40, "equip": ["fogao", "pressao"],
+     "ingr": [{"item": "arroz", "qtd": 250}, {"item": "frango", "qtd": 600}], "sobra": "frango extra vai no jantar"}],
+    "compras": [{"item": "flocão", "emb": "pacote 500 g", "tam": 500, "un": "g", "preco": 3.5, "secao": "Mercearia", "promo": 0},
+                {"item": "ovo", "emb": "bandeja 30 ovos", "tam": 30, "un": "un", "preco": 19.9, "secao": "Ovos e laticínios", "promo": 0},
+                {"item": "arroz", "emb": "pacote 5 kg", "tam": 5000, "un": "g", "preco": 24.9, "secao": "Mercearia", "promo": 0},
+                {"item": "frango", "emb": "bandeja 1 kg", "tam": 1000, "un": "g", "preco": 17.9, "secao": "Açougue e aves", "promo": 7}]}
+interno = cardapio.expandir(compacto)
+ok([(r["dia"], r["tipo"]) for r in interno["refeicoes"]] == [("seg", "cafe"), ("seg", "almoco"), ("ter", "cafe"), ("qua", "cafe")],
+   "café repetido em 3 dias vira 3 refeições (uma entrada só no JSON), na ordem da semana")
+ing_ovo = interno["refeicoes"][0]["ingredientes"][1]
+ok(ing_ovo["unidade"] == "un" and interno["refeicoes"][1]["ingredientes"][1]["unidade"] == "g",
+   "a unidade do ingrediente vem da embalagem (Ovo -> un; frango -> g)")
+prod = {p["item"]: p for p in interno["produtos"]}
+ok(not prod["arroz"]["perecivel"] and prod["frango"]["perecivel"] and prod["ovo"]["perecivel"]
+   and prod["frango"]["promocao_id"] == 7 and prod["arroz"]["embalagem"] == "pacote 5 kg",
+   "perecível vem da seção (Mercearia não estraga; açougue e ovos estragam) e a promoção é mantida")
+interno["refeicoes"][2]["ingredientes"][0]["quantidade"] = 999
+ok(interno["refeicoes"][0]["ingredientes"][0]["quantidade"] == 200, "cada dia do café é uma refeição independente")
+calc_c = cesta.calcular(cardapio.expandir(compacto), {})
+ok(calc_c["total"] == round(3.5 * 2 + 19.9 + 24.9 + 17.9, 2), f"cesta calculada do formato compacto (R$ {calc_c['total']:.2f})")
+sem_compra = copy.deepcopy(compacto)
+sem_compra["refeicoes"][1]["ingr"].append({"item": "pimentão", "qtd": 1})
+plano_sc = cardapio.expandir(sem_compra)
+novo_banco()
+perfil_c = criar_usuario(refeicoes=["cafe", "almoco"], dias=["seg"], utensilios=["fogao", "pressao"], restricoes=[])
+g, _ = cardapio.conferir(plano_sc, perfil_c, cesta.calcular(plano_sc, {}), 500)
+ok(any("sem embalagem" in x and "pimentão" in x for x in g), "ingrediente sem compra na lista é barrado")
+absurdo = copy.deepcopy(compacto)
+absurdo["refeicoes"][1]["ingr"][0]["qtd"] = 250000
+plano_ab = cardapio.expandir(absurdo)
+g, _ = cardapio.conferir(plano_ab, perfil_c, cesta.calcular(plano_ab, {}), 5000)
+ok(any("fora do normal" in x for x in g), "quantidade absurda (unidade trocada pela IA) é barrada")
+gemini, claude = instalar_ias()
+criar_usuario("u9", refeicoes=["cafe", "almoco", "jantar"], dias=["seg", "ter", "qua"])
+agrupado = para_ia(plano_valido())
+agrupado["refeicoes"].append({"dias": ["seg", "ter", "qua"], "tipo": "cafe", "prato": "Cuscuz com ovo", "min": 15,
+                              "equip": ["fogao"], "ingr": [{"item": "flocão de milho", "qtd": 150}, {"item": "ovo", "qtd": 3}],
+                              "sobra": ""})
+claude.fila = [agrupado]
+plano_ag = asyncio.run(cardapio.gerar_plano("u9"))
+ok(len(plano_ag["refeicoes"]) == 9 and modelos(claude) == [SONNET] and plano_ag["cesta"]["total"] > 0
+   and plano_ag["receitas"] == {},
+   "plano com café agrupado é aceito pelo Sonnet de primeira, sem receitas prontas (geradas ao abrir)")
 
 # =======================================================================================
 secao("Cadastro com botões")
@@ -595,7 +680,7 @@ secao("Troca de prato com o orçamento apertado (teste real de 24/11)")
 novo_banco()
 gemini, claude = instalar_ias()
 criar_usuario()
-claude.fila = [plano_valido()]
+claude.fila = [para_ia(plano_valido())]
 plano = asyncio.run(cardapio.gerar_plano("u1"))
 i_tj = cardapio.indice(plano, "ter", "jantar")
 sem_prato = copy.deepcopy(plano)
@@ -604,8 +689,7 @@ calc_sem = cesta.calcular(sem_prato, plano.get("despensa_inicial") or {})
 folga_exata = plano["orcamento"] - calc_sem["total"]
 
 claude.chamadas.clear()
-claude.fila = [{"refeicao": refeicao("ter", "jantar", "Arroz carreteiro", [("arroz", 300, "g"), ("carne moída", 200, "g")]),
-                "produtos_novos": []}]
+claude.fila = [troca_ia(refeicao("ter", "jantar", "Arroz carreteiro", [("arroz", 300, "g"), ("carne moída", 200, "g")]))]
 asyncio.run(cardapio.trocar_prato("u1", "ter", "jantar"))
 briefing = claude.chamadas[0]["mensagens"][0]["texto"]
 ok(f"NO MÁXIMO R$ {folga_exata:.2f}" in briefing,
@@ -623,8 +707,8 @@ ok(not claude.chamadas and "orçamento" in s[0].texto and "tentar de novo" not i
    "troca sem folga no orçamento: avisa a pessoa sem gastar com a IA")
 banco.atualizar_plano(atual["id"], {k: v for k, v in atual.items() if k not in ("id", "criado_em")})
 
-caro = {"refeicao": refeicao("ter", "jantar", "Picanha na chapa", [("picanha", 1000, "g")]),
-        "produtos_novos": [produto("picanha", "peça 1 kg", 1000, "g", 150.0, "Açougue e aves", True)]}
+caro = troca_ia(refeicao("ter", "jantar", "Picanha na chapa", [("picanha", 1000, "g")]),
+               [produto("picanha", "peça 1 kg", 1000, "g", 150.0, "Açougue e aves", True)])
 claude.fila = [caro, caro, caro]
 claude.chamadas.clear()
 s = asyncio.run(atendimento.trocar_prato("u1", "ter", "jantar"))
