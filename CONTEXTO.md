@@ -84,6 +84,13 @@ por texto, áudio e foto, e uma escada de modelos de IA que sobe de nível só q
     semanal, `/avisos`, `/promo`, limpeza das vencidas e preferência às promoções no cardápio.
     **C15:** "Onde comprar" com total por mercado, divisão (R$ 15+) e PDF separado por mercado.
     O dono testou o cardápio no celular: Sonnet reprovado no orçamento, Opus refez (US$ 0,42).
+12. **PR #2 de outro colaborador (24/11):** velocidade do toque de botão (~930 ms para ~220 ms,
+    medido por ele), teclado novo de múltipla escolha e robustez. Revisado aqui: o filtro de
+    escopo novo barrava 12 de 17 frases normais ("me passa as instruções" do preparo,
+    "esquece tudo, vou começar de novo"...) e foi reduzido aos padrões inequívocos; a tela
+    passou a ser redesenhada depois do limite do Telegram; o aviso de cache do `/custos` faz
+    a conta em dinheiro; mídia com teto de 16 mil tokens; toque confirmado mesmo com erro.
+    Juntado na main com o PR #1 (337 testes).
 
 ## 3. Arquitetura (cada arquivo com um papel)
 
@@ -130,6 +137,15 @@ coletor), `estado` (marcadores do robô, ex.: última promoção avisada), `uso_
   "medium" em troca e cardápio); `stop_reason` "refusal" sobe de nível; prompt caching nas
   instruções fixas (conferido na API real: 3.699 tokens lidos do cache, custo ~7x menor).
   O "fallback no servidor" da Anthropic **não** foi ativado (a regra manda recusa para o próximo nível).
+- **Velocidade dos botões (PR #2):** a conexão com o Telegram fica aberta (keepalive de 600 s,
+  o padrão do httpx era 5 s) e é aquecida a cada 120 s com `getMe`; o toque é confirmado em
+  paralelo; "digitando..." só depois de 0,25 s; edições seguidas da mesma mensagem são
+  juntadas (0,4 s). `RENDE_MEDIR_LATENCIA=1` registra o tempo de cada etapa.
+- **SQLite em WAL** (`synchronous=NORMAL`): gravação ~10x mais rápida; pode perder só a última
+  gravação numa queda de energia. Ao fazer cópia de segurança, copiar também `rende.db-wal`
+  (ou usar o `.backup` do sqlite3), senão as gravações recentes ficam de fora.
+- **Filtro rápido de escopo é economia, não defesa:** só padrões inequívocos; frase ambígua
+  vai para a IA e o campo `no_escopo` decide.
 - **Botões e telas neutras** (`telas.py`) para facilitar um canal futuro (WhatsApp).
 - Receita gerada só quando a pessoa abre o prato (Gemini, barato) e guardada no plano.
 - "Compra do mês" ainda gera plano semanal com orçamento mensal ÷ 4,3.

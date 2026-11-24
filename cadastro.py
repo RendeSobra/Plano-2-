@@ -24,11 +24,19 @@ PERGUNTAS = {
     "periodo": "Compra da semana ou do mês?",
     "orcamento": "Quanto quer gastar?",
 }
-OPCOES = {"refeicoes": {k: f"{i} {n}" for k, n, i in REFEICOES},
+# Rótulos das opções de múltipla escolha. Sem emoji: nos botões, quem marca a opção é o
+# ✅/⬜ no começo, e um segundo emoji no meio deixava os rótulos desalinhados.
+OPCOES = {"refeicoes": {k: n for k, n, _ in REFEICOES},
           "dias": dict(DIAS),
           "restricoes": NOMES_RESTRICOES,
           "utensilios": UTENSILIOS,
           "mercados": MERCADOS}
+MARCADO, DESMARCADO = "✅", "⬜"
+# Telas onde "Marcar todas" e "Limpar" fazem sentido (em mercados, "Qualquer um" já resolve;
+# em restrições existe "Nenhuma", e marcar todas as alergias de uma vez não faria sentido).
+COM_ATALHOS = ("refeicoes", "dias", "utensilios")
+# Quantas opções por linha em cada tela: os dias são curtos e iguais, cabem dois a dois.
+COLUNAS = {"dias": 2}
 PADROES = {"refeicoes": ["almoco", "jantar"], "dias": [d for d, _ in DIAS], "utensilios": ["fogao"],
            "mercados": ["qualquer"], "restricoes": []}
 # Custo médio por porção em Goiânia (sugestão de orçamento, não é preço real)
@@ -98,14 +106,41 @@ def resumo(perfil: dict) -> str:
 
 
 # --- telas de cada passo --------------------------------------------------------------
-def _multipla(perfil: dict, campo: str, colunas: int = 2) -> list[list[Botao]]:
+def _multipla(perfil: dict, campo: str, colunas: int | None = None) -> list[list[Botao]]:
+    """Opções de marcar/desmarcar. O estado vem sempre no começo do rótulo (✅/⬜), para a
+    coluna de marcação ficar alinhada, e uma opção por linha (os dias cabem dois a dois)."""
+    colunas = colunas or COLUNAS.get(campo, 1)
     escolhidos = set(perfil.get(campo) or [])
-    botoes = [Botao(("✅ " if k in escolhidos else "▫️ ") + rotulo, f"cad:t:{campo}:{k}")
+    botoes = [Botao(f"{MARCADO if k in escolhidos else DESMARCADO} {rotulo}", f"cad:t:{campo}:{k}")
               for k, rotulo in OPCOES[campo].items()]
-    return [botoes[i:i + colunas] for i in range(0, len(botoes), colunas)]
+    linhas = [botoes[i:i + colunas] for i in range(0, len(botoes), colunas)]
+    if campo in COM_ATALHOS:
+        todas = len(escolhidos) == len(OPCOES[campo])
+        linhas.append([Botao("Limpar", f"cad:limpar:{campo}")] if todas else
+                      [Botao("Marcar todas", f"cad:todas:{campo}"), Botao("Limpar", f"cad:limpar:{campo}")]
+                      if escolhidos else [Botao("Marcar todas", f"cad:todas:{campo}")])
+    return linhas
+
+
+# "Selecionadas" para refeições e restrições; "Selecionados" para dias, utensílios e mercados.
+_GENERO = {"refeicoes": ("Selecionadas", "Nenhuma refeição marcada ainda"),
+           "restricoes": ("Selecionadas", "Nenhuma restrição marcada"),
+           "dias": ("Selecionados", "Nenhum dia marcado ainda"),
+           "utensilios": ("Selecionados", "Nada marcado ainda"),
+           "mercados": ("Selecionados", "Nenhum mercado marcado ainda")}
+
+
+def selecionadas(perfil: dict, campo: str) -> str:
+    """'Selecionadas: Almoço, Jantar (2)' — o resumo que vai no texto da tela."""
+    rotulo, vazio = _GENERO[campo]
+    escolhidos = [OPCOES[campo][k] for k in OPCOES[campo] if k in set(perfil.get(campo) or [])]
+    return f"{rotulo}: {', '.join(escolhidos)} ({len(escolhidos)})" if escolhidos else vazio
 
 
 def _rodape(perfil: dict, passo: str, rotulo: str = "Continuar ▶️") -> list[list[Botao]]:
+    if passo in OPCOES:  # múltipla escolha: o botão mostra quantas foram marcadas
+        quantas = len(perfil.get(passo) or [])
+        rotulo = f"Continuar ({quantas}) ▶️" if quantas else "Continuar ▶️"
     linha = [Botao(rotulo, "cad:ok")]
     if not editando_pelo_perfil(perfil) and PASSOS.index(passo) > 1:
         linha.insert(0, Botao("⬅️ Voltar", "cad:voltar"))
@@ -136,12 +171,10 @@ def tela_do_passo(perfil: dict, passo: str, editar_msg: bool = False) -> Saida:
             "utensilios": "🍳 O que tem na sua cozinha? As receitas só vão usar isso.",
             "mercados": "🛒 Onde você costuma comprar?",
         }
-        t = textos[passo]
+        t = textos[passo] + f"\n\n{selecionadas(perfil, passo)}"
         if passo == "restricoes" and perfil.get("restricoes_outras"):
             t += f"\n\nOutras: {perfil['restricoes_outras']}"
-        botoes = _multipla(perfil, passo, 3 if passo == "dias" else 2)
-        if passo == "dias":
-            botoes.append([Botao("Todos os dias", "cad:todos:dias")])
+        botoes = _multipla(perfil, passo)
         if passo == "restricoes":
             botoes.append([Botao("✏️ Outra (escrever)", "cad:outro"), Botao("🚫 Nenhuma", "cad:nenhuma")])
         return tela(t, botoes + _rodape(perfil, passo), editar_msg)
@@ -241,9 +274,18 @@ def acao(usuario: str, acao_txt: str) -> list[Saida]:
             escolhidos = ["qualquer"] if valor == "qualquer" and "qualquer" in escolhidos else \
                 [m for m in escolhidos if m != "qualquer"]
         perfil = banco.atualizar_perfil(usuario, **{campo: escolhidos})
+        # Sem balão de aviso: o próprio botão virando ✅/⬜ (e o contador no texto) já é o retorno
         return [tela_do_passo(perfil, passo, True)]
 
-    if tipo == "todos":
+    if tipo in ("todas", "limpar"):  # atalhos da múltipla escolha
+        campo = partes[2]
+        if campo not in OPCOES:
+            return [Saida(texto="Não entendi esse botão 🤔")]
+        escolhidos = list(OPCOES[campo]) if tipo == "todas" else []
+        perfil = banco.atualizar_perfil(usuario, **{campo: escolhidos})
+        return [tela_do_passo(perfil, passo, True)]  # idem: a tela redesenhada já mostra o resultado
+
+    if tipo == "todos":  # botão antigo "Todos os dias" (mensagens já no chat)
         perfil = banco.atualizar_perfil(usuario, dias=[d for d, _ in DIAS])
         return [tela_do_passo(perfil, passo, True)]
 
@@ -277,7 +319,8 @@ def acao(usuario: str, acao_txt: str) -> list[Saida]:
         faltando = {"refeicoes": "Escolha pelo menos uma refeição 🙂", "dias": "Escolha pelo menos um dia 🙂",
                     "utensilios": "Marque pelo menos um item da cozinha 🙂", "mercados": "Escolha um mercado ou 'Qualquer um' 🙂"}
         if passo in faltando and not perfil.get(passo):
-            return [Saida(texto=faltando[passo])]
+            # Caixinha no próprio toque, em vez de uma mensagem nova empilhando no chat
+            return [Saida(tipo="aviso", toast=faltando[passo], alerta=True)]
         if passo in ("refeicoes", "dias") and not editando_pelo_perfil(perfil):
             banco.atualizar_perfil(usuario, orcamento=None)  # recalcula a sugestão lá no fim
         return avancar(usuario)
@@ -315,7 +358,7 @@ def resumo_perfil(perfil: dict, editar_msg: bool = False) -> Saida:
     t = "\n".join([
         f"👤 *Seu perfil, {perfil.get('nome') or ''}*", "",
         f"👥 {_familia(perfil)}",
-        "🍽️ " + ", ".join(OPCOES["refeicoes"][r].split(" ", 1)[1] for r in perfil.get("refeicoes") or []),
+        "🍽️ " + ", ".join(OPCOES["refeicoes"][r] for r in perfil.get("refeicoes") or []),
         "📅 " + ", ".join(dict(DIAS)[d][:3] for d in perfil.get("dias") or []),
         f"✨ {VIBES.get(perfil.get('vibe'), '-')}",
         f"⚠️ {', '.join(restr) or 'Nenhuma restrição'}",

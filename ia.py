@@ -79,7 +79,11 @@ def _para_gemini(mensagens: list[dict]) -> list[types.Content]:
 
 async def gerar(*, modelo: str, sistema: str, mensagens: list[dict], sistema_extra: str = "",
                 ferramentas: list[dict] | None = None, esquema_json: dict | None = None,
-                esforco: str | None = None, tempo: float = TEMPO_MAXIMO) -> RespostaIA:
+                esforco: str | None = None, tempo: float = TEMPO_MAXIMO,
+                max_tokens: int | None = None) -> RespostaIA:
+    """`esforco` e `max_tokens` existem para a interface ser a mesma do ia_claude e não são usados:
+    no Gemini o raciocínio entra no mesmo limite de saída, e cortar a resposta no meio custa uma
+    chamada nova (mais caro do que deixar o padrão do modelo)."""
     # o Gemini faz cache sozinho de prefixos repetidos: as instruções fixas vão primeiro
     config = types.GenerateContentConfig(system_instruction=f"{sistema}\n\n{sistema_extra}".strip())
     if ferramentas:

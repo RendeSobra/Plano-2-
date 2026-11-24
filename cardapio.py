@@ -388,19 +388,19 @@ async def gerar_plano(usuario: str, pedido: str = "", progresso: Progresso = _na
     passada = pratos_semana_passada(usuario)
 
     mensagens = [{"papel": "usuario", "texto": _briefing_plano(usuario, perfil, despensa, promos, pedido)}]
-    conferidos: dict[int, tuple] = {}  # id(resposta) -> (plano, calc, graves, avisos)
 
     async def conferir_resposta(resposta) -> list[str]:
+        """Guarda em resposta.conferencia o (plano, calc, graves, avisos) desta tentativa."""
         await progresso(2)  # Calculando a cesta (em código)
         try:
             plano = expandir(ler_json(resposta.texto))
             calc = cesta.calcular(plano, despensa)
         except (json.JSONDecodeError, TypeError, KeyError, ValueError) as erro:
-            conferidos[id(resposta)] = (None, None, [f"JSON inválido ({erro})"], [])
+            resposta.conferencia = (None, None, [f"JSON inválido ({erro})"], [])
             return [f"JSON inválido ({erro})"]
         await progresso(3)  # Conferindo o orçamento (e alergias, repetição, utensílios)
         graves, avisos = conferir(plano, perfil, calc, orcamento, passada)
-        conferidos[id(resposta)] = (plano, calc, graves, avisos)
+        resposta.conferencia = (plano, calc, graves, avisos)
         return graves
 
     async def ao_tentar(_tentativa: int) -> None:
@@ -409,7 +409,7 @@ async def gerar_plano(usuario: str, pedido: str = "", progresso: Progresso = _na
     resposta = await roteador.gerar("cardapio", sistema=prompts.PLANO, mensagens=mensagens,
                                     esquema_json=ESQUEMA_PLANO, tempo=180, conferir=conferir_resposta,
                                     complexo=caso_complexo(perfil, promos, pedido), ao_tentar=ao_tentar)
-    plano, calc, graves, avisos = conferidos.get(id(resposta)) or (None, None, ["sem conferência"], [])
+    plano, calc, graves, avisos = resposta.conferencia or (None, None, ["sem conferência"], [])
     if plano is None or (graves and not all("acima do orçamento" in g for g in graves)):
         raise PlanoInvalido("; ".join(graves))
     if graves:
@@ -539,7 +539,6 @@ async def trocar_prato(usuario: str, dia: str, tipo: str, pedido: str = "") -> d
       + ([f"Pratos rejeitados (NÃO use): {'; '.join(rejeitados(perfil))}"] if rejeitados(perfil) else [])
       + ([f"A pessoa NÃO encontrou no mercado (não use): {'; '.join(nao_achou)}"] if nao_achou else []))
     mensagens = [{"papel": "usuario", "texto": briefing}]
-    conferidos: dict[int, tuple] = {}
 
     def conferir_troca(resposta) -> list[str]:
         try:
@@ -566,12 +565,12 @@ async def trocar_prato(usuario: str, dia: str, tipo: str, pedido: str = "") -> d
         usa_o_que_faltou = [i["item"] for i in novo["ingredientes"] if cesta.chave(i["item"]) in faltou]
         if usa_o_que_faltou:
             graves.append(f"o prato novo usa o que a pessoa não encontrou no mercado: {', '.join(usa_o_que_faltou)}")
-        conferidos[id(resposta)] = (plano_novo, calc_novo, graves)
+        resposta.conferencia = (plano_novo, calc_novo, graves)
         return graves
 
     resposta = await roteador.gerar("troca", sistema=prompts.TROCA, mensagens=mensagens,
                                     esquema_json=ESQUEMA_TROCA, tempo=120, conferir=conferir_troca)
-    novo_plano, calc, graves = conferidos.get(id(resposta)) or (None, None, resposta.problemas or ["JSON inválido"])
+    novo_plano, calc, graves = resposta.conferencia or (None, None, resposta.problemas or ["JSON inválido"])
     if graves:  # na troca, nada de passar do orçamento: o plano fica como estava
         if roteador.categoria(graves) == "orçamento":
             raise SemFolga("; ".join(graves), folga)

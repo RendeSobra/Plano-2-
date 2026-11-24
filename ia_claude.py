@@ -34,6 +34,9 @@ log = logging.getLogger("rende.ia_claude")
 TEMPO_MAXIMO = 120  # segundos (por leitura do streaming)
 # Em 24/11 o Sonnet usou os 16 mil tokens inteiros (raciocínio + JSON) e o cardápio saiu
 # cortado. Só se paga o que o modelo usa; o limite maior evita refazer tudo no Opus.
+# Quem chama escolhe o teto por tarefa (roteador.MAX_TOKENS_TAREFA): a Anthropic reserva
+# esse valor na conta de tokens por minuto, então pedir 32 mil numa conversa curta gasta
+# folga de limite à toa. Este é o padrão de quem não escolher.
 MAX_TOKENS = 32000
 
 _cliente: anthropic.AsyncAnthropic | None = None
@@ -105,13 +108,14 @@ def _sistema(sistema: str, sistema_extra: str) -> list[dict]:
 
 async def gerar(*, modelo: str, sistema: str, mensagens: list[dict], sistema_extra: str = "",
                 ferramentas: list[dict] | None = None, esquema_json: dict | None = None,
-                esforco: str | None = None, tempo: float = TEMPO_MAXIMO) -> RespostaIA:
+                esforco: str | None = None, tempo: float = TEMPO_MAXIMO,
+                max_tokens: int = MAX_TOKENS) -> RespostaIA:
     if not disponivel():
         raise ErroIA("Claude: falta ANTHROPIC_API_KEY no .env")
 
     parametros: dict = {
         "model": modelo,
-        "max_tokens": MAX_TOKENS,
+        "max_tokens": max_tokens,
         "system": _sistema(sistema, sistema_extra),
         "messages": _para_claude(mensagens),
     }
@@ -145,7 +149,7 @@ async def gerar(*, modelo: str, sistema: str, mensagens: list[dict], sistema_ext
     if resposta.stop_reason == "refusal":  # sempre conferido antes de ler o conteúdo
         return RespostaIA(recusou=True, **base)
     if resposta.stop_reason == "max_tokens":
-        log.warning("Claude: resposta de %s cortada no limite de %d tokens de saída", modelo, MAX_TOKENS)
+        log.warning("Claude: resposta de %s cortada no limite de %d tokens de saída", modelo, max_tokens)
 
     texto = "".join(b.text for b in resposta.content if b.type == "text").strip()
     chamadas = [Chamada(id=b.id, nome=b.name, args=dict(b.input or {}))

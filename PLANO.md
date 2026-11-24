@@ -11,7 +11,7 @@ O **Pedido I** (mesmo arquivo) manda executar os itens pendentes do H numa ordem
 com decisões do dono que valem por cima do H (ver "Decisões do Pedido I").
 Histórico, testes reais e detalhes: [CONTEXTO.md](CONTEXTO.md).
 
-Testes automáticos: `.venv\Scripts\python testes\testar.py` (**281 de 281 OK em 24/11/2026**).
+Testes automáticos: `.venv\Scripts\python testes\testar.py` (**337 de 337 OK em 24/11/2026**).
 
 ## Pedidos e situação
 
@@ -27,6 +27,7 @@ Testes automáticos: `.venv\Scripts\python testes\testar.py` (**281 de 281 OK em
 | G | Mensagens de troca e PDF sem poluir o chat; contexto no GitHub | ✅ Feito |
 | H | Retomada com a especificação completa (PARTES A a F) | 🔧 PARTE A ✅ (24/11). Itens pendentes: ver Pedido I |
 | I | Executar os pendentes do H sem parar entre etapas + Modo mercado + PDF com caixinhas | 🔧 Custo do cardápio ✅ · C10 ✅ · C9, C11 e Modo mercado ✅ · C6 ✅ · C2 ✅ · C3 ✅ · C13 ✅ · C14 ✅ · C15 ✅ · C12 ✅ · relatório ✅ (24/11). Falta: teste no celular (roteiro em docs/RELATORIO.md) |
+| PR #2 | Outro colaborador: toque de botão de ~930 ms para ~220 ms (conexão com o Telegram mantida aberta e aquecida, confirmação do toque em paralelo, SQLite em WAL), teclado de múltipla escolha novo (⬜/✅, contador, "Marcar todas"/"Limpar") e robustez | ✅ Revisado, corrigido (filtro de escopo que barrava frases normais, tela redesenhada depois do limite do Telegram, conta do cache no `/custos`, teto de tokens da mídia, toque confirmado no erro) e juntado na main (24/11). Falta ver a velocidade no celular |
 
 ## Pedido H: situação de cada item da PARTE C (conferido em 24/11/2026)
 
