@@ -93,6 +93,19 @@ CREATE TABLE IF NOT EXISTS precos (       -- preços vistos de verdade (sem dize
     criado_em   TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS precos_produto ON precos (produto, criado_em);
+CREATE TABLE IF NOT EXISTS encartes (      -- encartes já lidos pelo coletor (o mesmo não vai de novo para a IA)
+    hash          TEXT PRIMARY KEY,      -- sha256 do arquivo
+    rede          TEXT NOT NULL,
+    url           TEXT NOT NULL,
+    titulo        TEXT,
+    ofertas       INTEGER NOT NULL,      -- quantas ofertas novas entraram
+    processado_em TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS encartes_url ON encartes (url);
+CREATE TABLE IF NOT EXISTS estado (        -- marcadores do robô (ex.: última promoção já avisada)
+    chave TEXT PRIMARY KEY,
+    valor TEXT
+);
 CREATE TABLE IF NOT EXISTS uso_diario (
     telegram_id TEXT NOT NULL,
     dia         TEXT NOT NULL,
@@ -329,6 +342,51 @@ def apagar_promocoes_vencidas() -> int:
     cur = _db().execute("DELETE FROM promocoes WHERE validade < ?", (hoje(),))
     _db().commit()
     return cur.rowcount
+
+
+def promocoes_desde(ultimo_id: int, cidade: str | None = None) -> list[dict]:
+    """Promoções válidas cadastradas depois de um id (para os avisos de promoção nova)."""
+    sql, parametros = "SELECT * FROM promocoes WHERE id > ? AND validade >= ?", [ultimo_id, hoje()]
+    if cidade:
+        sql += " AND lower(cidade) LIKE ?"
+        parametros.append(f"%{cidade.strip().lower()}%")
+    return [dict(l) for l in _db().execute(sql + " ORDER BY id", parametros).fetchall()]
+
+
+def ultima_promocao_id() -> int:
+    linha = _db().execute("SELECT MAX(id) AS n FROM promocoes").fetchone()
+    return linha["n"] or 0
+
+
+# --- coletor: encartes já lidos ----------------------------------------------
+def encarte_lido(*, hash_arquivo: str | None = None, url: str | None = None) -> bool:
+    if hash_arquivo and _db().execute("SELECT 1 FROM encartes WHERE hash = ?", (hash_arquivo,)).fetchone():
+        return True
+    return bool(url and _db().execute("SELECT 1 FROM encartes WHERE url = ?", (url,)).fetchone())
+
+
+def registrar_encarte(*, hash_arquivo: str, rede: str, url: str, titulo: str | None, ofertas: int) -> None:
+    _db().execute("""INSERT INTO encartes (hash, rede, url, titulo, ofertas, processado_em) VALUES (?, ?, ?, ?, ?, ?)
+                     ON CONFLICT (hash) DO NOTHING""", (hash_arquivo, rede, url, titulo, ofertas, _agora_txt()))
+    if not _db().execute("SELECT 1 FROM encartes WHERE url = ?", (url,)).fetchone():
+        # mesmo arquivo publicado em outro endereço: guarda o endereço novo também
+        _db().execute("INSERT INTO encartes (hash, rede, url, titulo, ofertas, processado_em) VALUES (?, ?, ?, ?, 0, ?)",
+                      (f"{hash_arquivo}:{url}", rede, url, titulo, _agora_txt()))
+    # o histórico de encartes só precisa cobrir os que ainda podem estar no ar
+    _db().execute("DELETE FROM encartes WHERE processado_em < ?", ((agora() - timedelta(days=90)).isoformat(),))
+    _db().commit()
+
+
+# --- estado do robô (chave -> valor) -----------------------------------------
+def estado(chave: str, padrao: str | None = None) -> str | None:
+    linha = _db().execute("SELECT valor FROM estado WHERE chave = ?", (chave,)).fetchone()
+    return linha["valor"] if linha else padrao
+
+
+def gravar_estado(chave: str, valor: str) -> None:
+    _db().execute("INSERT INTO estado (chave, valor) VALUES (?, ?) ON CONFLICT (chave) DO UPDATE SET valor = ?",
+                  (chave, valor, valor))
+    _db().commit()
 
 
 # --- preços vistos de verdade (Modo mercado, coletor) -------------------------

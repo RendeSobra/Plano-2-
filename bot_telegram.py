@@ -12,14 +12,14 @@ import logging
 import os
 import re
 import sys
-from datetime import timedelta
+from datetime import time as horario, timedelta
 
 import httpx
 from dotenv import load_dotenv
 from telegram import (BotCommand, InlineKeyboardButton, InlineKeyboardMarkup, InputFile, KeyboardButton,
                       Message, ReplyKeyboardMarkup, Update)
 from telegram.constants import ChatAction, ParseMode
-from telegram.error import BadRequest, RetryAfter, TelegramError
+from telegram.error import BadRequest, Forbidden, RetryAfter, TelegramError
 from telegram.ext import (Application, CallbackQueryHandler, CommandHandler, ContextTypes, MessageHandler,
                           filters)
 from telegram.request import HTTPXRequest
@@ -27,8 +27,10 @@ from telegram.request import HTTPXRequest
 load_dotenv()
 
 import atendimento  # noqa: E402  (depois do load_dotenv: os módulos leem o .env)
+import avisos  # noqa: E402
 import banco  # noqa: E402
 import cardapio  # noqa: E402
+import coletor  # noqa: E402
 import prompts  # noqa: E402
 import telas  # noqa: E402
 from telas import Saida  # noqa: E402
@@ -77,11 +79,14 @@ KEEPALIVE_SEGUNDOS = 600.0
 # Medido em 24/11: a conexão continua rápida depois de 65 s e de 125 s parada (201-208 ms). Não
 # sabemos onde o servidor do Telegram desiste, então reaquecemos dentro da janela já comprovada.
 INTERVALO_AQUECIMENTO = 120
+HORA_COLETA = os.getenv("COLETOR_HORA") or "06:00"   # coleta diária das promoções (horário de Brasília)
+_trava_coleta = asyncio.Lock()                       # nunca duas coletas ao mesmo tempo
 NOME_BOT = "Rende"
 DESCRICAO = ("Seu amigo do mercado: monto o cardápio da semana no seu orçamento, com a lista de compras "
              "por embalagem, receitas passo a passo e promoções.")
 COMANDOS = [BotCommand("start", "Começar"), BotCommand("perfil", "Ver ou mudar meu perfil"),
             BotCommand("novo", "Recomeçar a conversa (mantém o perfil)"),
+            BotCommand("avisos", "Ligar ou desligar os avisos de promoção"),
             BotCommand("esquecer", "Apagar todos os meus dados")]
 
 
@@ -378,6 +383,102 @@ async def cmd_custos(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
     await mostrar(context, update.effective_chat.id, usuario, saidas)
 
 
+async def avisar_admins(bot, texto: str) -> None:
+    for admin in atendimento.admins():
+        with contextlib.suppress(TelegramError, ValueError):
+            await _enviar_texto(bot, int(admin), texto)
+
+
+async def rodar_coleta(bot) -> list[coletor.ResultadoRede]:
+    """Coleta as promoções dos sites; se uma rede quebrar, o admin recebe um aviso.
+    Depois, as promoções novas viram avisos para quem tem o produto na lista."""
+    async with _trava_coleta:
+        resultados = await coletor.coletar()
+    problemas = coletor.falhas(resultados)
+    if problemas:
+        linhas = "\n".join(f"• {p}" for p in problemas[:10])
+        await avisar_admins(bot, f"⚠️ *Coletor de promoções com problema*\n{linhas}")
+    await enviar_avisos(bot)
+    return resultados
+
+
+# --- avisos (C14) ---------------------------------------------------------------------
+_trava_avisos = asyncio.Lock()
+
+
+async def enviar_avisos(bot) -> int:
+    """Manda o que avisos.pendentes() decidir (resumos semanais e promoções novas)."""
+    async with _trava_avisos:
+        enviados = 0
+        for usuario, saida in avisos.pendentes():
+            try:
+                await _enviar_texto(bot, int(usuario), saida.texto, _teclado(saida))
+                enviados += 1
+            except Forbidden:  # a pessoa bloqueou o bot: para de mandar avisos
+                avisos.desligar_por_bloqueio(usuario)
+            except (TelegramError, ValueError) as erro:
+                log.warning("Não consegui entregar um aviso: %s", erro)
+            await asyncio.sleep(0.05)  # bem abaixo do limite do Telegram (30 mensagens/s)
+        return enviados
+
+
+async def tarefa_avisos(context: ContextTypes.DEFAULT_TYPE) -> None:
+    """JobQueue, a cada 15 min: resumo semanal na hora escolhida e avisos de promoção nova."""
+    try:
+        await enviar_avisos(context.bot)
+    except Exception:
+        log.exception("A rodada de avisos falhou")
+
+
+async def tarefa_limpeza(context: ContextTypes.DEFAULT_TYPE) -> None:
+    """JobQueue, todo dia: promoções vencidas somem do banco."""
+    apagadas = banco.apagar_promocoes_vencidas()
+    if apagadas:
+        log.info("Limpeza: %d promoções vencidas apagadas.", apagadas)
+
+
+async def cmd_avisos(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """/avisos liga e desliga os avisos."""
+    usuario = _usuario(update)
+    await mostrar(context, update.effective_chat.id, usuario, [avisos.alternar(usuario)])
+
+
+async def cmd_promo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """/promo (só admin): cadastra uma oferta à mão; os avisos saem logo em seguida."""
+    usuario = _usuario(update)
+    texto = (update.effective_message.text or "").partition(" ")[2]
+    saidas, nova = atendimento.cadastrar_promocao(usuario, texto)
+    await mostrar(context, update.effective_chat.id, usuario, saidas)
+    if nova:
+        await enviar_avisos(context.bot)
+
+
+async def tarefa_coleta(context: ContextTypes.DEFAULT_TYPE) -> None:
+    """JobQueue: 1 coleta por dia (C13)."""
+    try:
+        await rodar_coleta(context.bot)
+    except Exception:
+        log.exception("A coleta diária de promoções falhou")
+        await avisar_admins(context.bot, "⚠️ A coleta diária de promoções falhou. Veja o registro do bot.")
+
+
+async def cmd_coletar(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """/coletar (só admin): roda a coleta na hora e mostra o resultado por rede."""
+    usuario, chat_id = _usuario(update), update.effective_chat.id
+    if not atendimento.eh_admin(usuario):
+        await mostrar(context, chat_id, usuario, [telas.texto(prompts.SO_ADMIN)])
+        return
+    if _trava_coleta.locked():
+        await mostrar(context, chat_id, usuario, [telas.texto("⏳ Já tem uma coleta rodando. Espere ela terminar.")])
+        return
+    aviso = await _enviar_texto(context.bot, chat_id, "🔎 Coletando as promoções dos sites (5 s entre acessos "
+                                                      "a cada site; pode levar alguns minutos)...")
+    async with _digitando(context.bot, chat_id):
+        resultados = await rodar_coleta(context.bot)
+    if aviso is None or not await _editar(aviso, coletor.texto_resultado(resultados)):
+        await mostrar(context, chat_id, usuario, [telas.texto(coletor.texto_resultado(resultados))])
+
+
 async def comando_desconhecido(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     await mostrar(context, update.effective_chat.id, _usuario(update), [telas.texto(prompts.COMANDO_DESCONHECIDO)])
 
@@ -536,6 +637,9 @@ def main() -> None:
     app.add_handler(CommandHandler("novo", cmd_novo))
     app.add_handler(CommandHandler("esquecer", cmd_esquecer))
     app.add_handler(CommandHandler("custos", cmd_custos))
+    app.add_handler(CommandHandler("coletar", cmd_coletar))
+    app.add_handler(CommandHandler("avisos", cmd_avisos))
+    app.add_handler(CommandHandler("promo", cmd_promo))
     app.add_handler(MessageHandler(filters.COMMAND, comando_desconhecido))
     app.add_handler(CallbackQueryHandler(botao))
     app.add_handler(MessageHandler(filters.TEXT, mensagem_de_texto))
@@ -547,6 +651,10 @@ def main() -> None:
     app.add_handler(MessageHandler(filters.Sticker.ALL, figurinha))
     app.add_handler(MessageHandler(~filters.TEXT, tipo_nao_suportado))
     app.add_error_handler(ao_dar_erro)
+    hora, minuto = (int(x) for x in HORA_COLETA.split(":"))
+    app.job_queue.run_daily(tarefa_coleta, time=horario(hora, minuto, tzinfo=banco.FUSO_BRASILIA), name="coleta")
+    app.job_queue.run_daily(tarefa_limpeza, time=horario(0, 10, tzinfo=banco.FUSO_BRASILIA), name="limpeza")
+    app.job_queue.run_repeating(tarefa_avisos, interval=15 * 60, first=60, name="avisos")
     app.run_polling(allowed_updates=[Update.MESSAGE, Update.CALLBACK_QUERY])
 
 

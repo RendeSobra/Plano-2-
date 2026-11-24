@@ -1131,6 +1131,23 @@ suspeitos = [f"{arq.name}:{n}" for arq in sorted(RAIZ.glob("*.py"))
 ok(not suspeitos, f"nenhuma linha de log do código grava o ID do usuário {suspeitos}")
 
 # =======================================================================================
+import casos_coletor  # noqa: E402
+
+casos_coletor.rodar(ok, secao, novo_banco, instalar_ias)
+
+import casos_avisos  # noqa: E402
+
+casos_avisos.rodar(ok, secao, novo_banco, criar_usuario, plano_valido)
+
+import casos_onde_comprar  # noqa: E402
+
+casos_onde_comprar.rodar(ok, secao, novo_banco, criar_usuario, refeicao, produto)
+
+import casos_mercados  # noqa: E402
+
+casos_mercados.rodar(ok, secao, novo_banco, criar_usuario, plano_valido)
+
+# =======================================================================================
 secao("Formato para cada IA")
 msgs = [{"papel": "assistente", "texto": "oi"},
         {"papel": "usuario", "texto": "foto", "anexo": {"mime_type": "image/jpeg", "dados": b"jpg"}},

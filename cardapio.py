@@ -13,6 +13,7 @@ from collections.abc import Awaitable, Callable
 
 import banco
 import cesta
+import promocoes
 import prompts
 import restricoes
 import roteador
@@ -31,7 +32,7 @@ VIBES = {"rapido": "Rápido e fácil", "domingo": "Cozinhar no domingo para a se
 UTENSILIOS = {"fogao": "Fogão", "forno": "Forno", "microondas": "Micro-ondas", "airfryer": "Airfryer",
               "pressao": "Panela de pressão", "eletrica": "Panela elétrica"}
 MERCADOS = {"assai": "Assaí", "atacadao": "Atacadão/Carrefour", "tatico": "Tático", "barao": "Barão",
-            "cerrado": "Cerrado", "diadia": "Dia a Dia", "qualquer": "Qualquer um"}
+            "cerrado": "Cerrado", "diadia": "Dia a Dia", "prezunic": "Prezunic", "qualquer": "Qualquer um"}
 SECOES = ["Hortifrúti", "Açougue e aves", "Ovos e laticínios", "Padaria", "Mercearia",
           "Temperos e outros"]
 NOME_DIA = dict(DIAS)
@@ -349,13 +350,24 @@ def caso_complexo(perfil: dict, promos: list[dict], pedido: str = "") -> bool:
     return varios_mercados and pede_otimizar
 
 
+MAX_PROMOS_CARDAPIO = 40
+
+
 def _promos_do_perfil(perfil: dict) -> list[dict]:
-    promos = banco.promocoes_validas(cidade=perfil.get("cidade") or "Goiânia")
+    """C14: promoções de comida que a pessoa pode comer, nos mercados dela, maior desconto primeiro."""
+    promos = banco.promocoes_validas(cidade=perfil.get("cidade") or "Goiânia", limite=2000)
     mercados = [m for m in (perfil.get("mercados") or []) if m != "qualquer"]
     if mercados:
         nomes = [restricoes.normalizar(MERCADOS.get(m, m)).split()[0] for m in mercados]
         promos = [p for p in promos if any(n in restricoes.normalizar(p["mercado"]) for n in nomes)]
-    return promos
+    restr, outras = perfil.get("restricoes") or [], perfil.get("restricoes_outras")
+    promos = [p for p in promos if promocoes.eh_comida(p["produto"])
+              and not restricoes.violacoes(p["produto"], restr, outras)]
+
+    def desconto(p: dict) -> float:
+        return (p["preco_anterior"] - p["preco"]) / p["preco_anterior"] if p.get("preco_anterior") else 0.0
+    promos.sort(key=lambda p: (-desconto(p), p["preco"]))
+    return promos[:MAX_PROMOS_CARDAPIO]
 
 
 Progresso = Callable[[int], Awaitable[None]]

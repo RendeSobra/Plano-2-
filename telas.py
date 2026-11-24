@@ -75,10 +75,10 @@ def progresso(atual: int, ajustando: bool = False, concluido: bool = False) -> s
 
 # --- resultado ------------------------------------------------------------------
 def _botoes_resultado() -> list[list[Botao]]:
-    """Botões do C9 (o [🏪 Onde comprar] entra com o C15) + [🛒 Modo mercado] (Pedido I)."""
+    """Botões do C9 + [🛒 Modo mercado] (Pedido I)."""
     return [[Botao("📅 Ver cardápio", "pl:dia"), Botao("🛒 Lista", "pl:lista")],
             [Botao("📄 PDF", "pl:pdf"), Botao("🔄 Refazer", "pl:refazer")],
-            [Botao("🛒 Modo mercado", "mm:ver")]]
+            [Botao("🏪 Onde comprar", "oc:ver"), Botao("🛒 Modo mercado", "mm:ver")]]
 
 
 def _botoes_acima_do_orcamento(plano: dict, perfil: dict) -> list[list[Botao]]:
@@ -147,6 +147,9 @@ def dia(plano: dict, d: str | None = None, editar: bool = True, aviso: str = "")
 
 # --- lista de compras ------------------------------------------------------------
 def promocao_da_linha(plano: dict, linha: dict) -> dict | None:
+    escolhido = mercado.escolha(plano, linha)
+    if escolhido is not None:  # C15: a pessoa escolheu onde comprar; vale a promoção daquele mercado
+        return escolhido.get("promocao")
     if not linha.get("promocao_id"):
         return None
     return (plano.get("promocoes") or {}).get(str(linha["promocao_id"]))
@@ -154,6 +157,11 @@ def promocao_da_linha(plano: dict, linha: dict) -> dict | None:
 
 def lista(plano: dict, editar: bool = True) -> Saida:
     linhas_txt = ["🛒 *Lista de compras*"]
+    escolhidos = (plano.get("onde_comprar") or {}).get("mercados") or []
+    if len(escolhidos) == 1:
+        linhas_txt.append(f"🏪 Preços do {escolhidos[0]}")
+    elif len(escolhidos) > 1:
+        linhas_txt.append(f"✂️ Compra dividida: {' e '.join(escolhidos)}")
     secao_atual = None
     tem_promo = False
     for l in plano["cesta"]["linhas"]:
@@ -164,6 +172,8 @@ def lista(plano: dict, editar: bool = True) -> Saida:
             linhas_txt += ["", f"*{secao_atual}*"]
         promo = promocao_da_linha(plano, l)
         marca = f" 🔥 {promo['mercado']} até {data_br(promo['validade'])}" if promo else ""
+        if len(escolhidos) > 1 and not promo and mercado.escolha(plano, l):
+            marca = f" · {mercado.escolha(plano, l)['mercado']}"
         tem_promo |= bool(promo)
         linhas_txt.append(f"• {l['nome']}, {cesta.texto_embalagem(l)}: {brl(mercado.custo_linha(plano, l))}{marca}")
     de_casa = [l for l in plano["cesta"]["linhas"] if l["da_despensa"] > 0]
@@ -189,7 +199,7 @@ def fora_do_escopo(texto_fixo: str) -> Saida:
 
 def promocoes(promos: list[dict], cidade: str, vazio: str, editar: bool = True) -> Saida:
     if not promos:
-        return tela(vazio, [[Botao("🏠 Resumo", "pl:res")]], editar)
+        return tela(vazio, [[Botao("📍 Mercados perto de mim", "lc:ver")], [Botao("🏠 Resumo", "pl:res")]], editar)
     linhas_txt = [f"🔥 *Promoções em {cidade}*", ""]
     for p in promos[:15]:
         descricao = " ".join(x for x in (p["produto"], p.get("marca"), p.get("tamanho")) if x)
@@ -197,7 +207,7 @@ def promocoes(promos: list[dict], cidade: str, vazio: str, editar: bool = True) 
         linhas_txt.append(f"• {descricao}: *{brl(p['preco'])}* no {p['mercado']} até {data_br(p['validade'])}{condicao}")
     if len(promos) > 15:
         linhas_txt += ["", f"...e mais {len(promos) - 15}. Pergunte por um produto que eu procuro."]
-    return tela("\n".join(linhas_txt), [[Botao("🏠 Resumo", "pl:res")]], editar)
+    return tela("\n".join(linhas_txt), [[Botao("📍 Mercados perto de mim", "lc:ver")], [Botao("🏠 Resumo", "pl:res")]], editar)
 
 
 # --- 🛒 Modo mercado (Pedido I) ----------------------------------------------------
@@ -322,3 +332,92 @@ def nota_salva(prato: str, nota: int) -> Saida:
 def confirmar_refazer() -> Saida:
     return tela("Refazer o plano inteiro? Monto tudo de novo, do zero.",
                 [[Botao("✅ Sim, refazer", "pl:montar"), Botao("❌ Cancelar", "pl:res")]], editar=True)
+
+
+# --- 🏪 Onde comprar (C15) ---------------------------------------------------------------
+MEDALHAS = ["🥇", "🥈", "🥉"]
+
+
+def chave_mercado(nome: str) -> str:
+    """Nome curto para o botão (o Telegram aceita até 64 bytes no botão)."""
+    from restricoes import normalizar
+    return normalizar(nome).replace(" ", "")[:24]
+
+
+def _km(distancia: float | None) -> str:
+    if distancia is None:
+        return ""
+    return f" · {distancia:.1f} km".replace(".", ",") if distancia >= 1 else f" · {round(distancia * 1000)} m"
+
+
+def onde_comprar(plano: dict, mercados: list, divisao, tem_localizacao: bool, condicoes: list[str],
+                 editar: bool = True) -> Saida:
+    import onde_comprar as oc
+    voltar = [[Botao("🛒 Lista", "pl:lista"), Botao("🏠 Resumo", "pl:res")]]
+    if not mercados:
+        return tela("🏪 Ainda não tenho preços de mercados para comparar 😕\n\nEscolha seus mercados no /perfil "
+                    "ou me mande a foto de um encarte que eu guardo as ofertas.", voltar, editar)
+    itens = len(mercados[0].itens)
+    linhas_txt = ["🏪 *Onde comprar sua lista*", f"{itens} itens. O total em cada mercado:", ""]
+    for i, m in enumerate(mercados[:3]):
+        promo = f" · 🔥 {m.com_promocao} em promoção" if m.com_promocao else " · ≈ só estimado"
+        linhas_txt.append(f"{MEDALHAS[i]} *{m.nome}*: {brl(m.total)}{_km(m.distancia_km)}{promo}")
+    if divisao:
+        a, b = divisao.mercados
+        linhas_txt += ["", f"💡 Dividindo entre *{a}* e *{b}* você economiza *{brl(divisao.economia)}* "
+                           f"(total {brl(divisao.total)})."]
+    melhor = mercados[0]
+    linhas_txt += ["", f"📊 No {melhor.nome}, {oc.porcentagem_real(melhor)}% da lista tem preço real (🔥 promoção); "
+                       "o resto é ≈ estimado."]
+    if condicoes:
+        linhas_txt += ["", "⚠️ *Condições das promoções:*"] + [f"• {c}" for c in condicoes[:6]]
+    if not tem_localizacao:
+        linhas_txt += ["", "📍 Mande sua localização para eu mostrar a distância de cada um."]
+    escolhida = (plano.get("onde_comprar") or {}).get("mercados")
+    if escolhida:
+        linhas_txt += ["", f"✅ Sua escolha: {' + '.join(escolhida)}."]
+    botoes = [[Botao(f"📋 {m.nome}", f"oc:m:{chave_mercado(m.nome)}") for m in mercados[:3]]]
+    if divisao:
+        botoes.append([Botao(f"✂️ Dividir: {divisao.mercados[0]} + {divisao.mercados[1]}", "oc:div")])
+    if escolhida:
+        botoes.append([Botao("↩️ Desfazer a escolha", "oc:limpar")])
+    if not tem_localizacao:
+        botoes.append([Botao("📍 Mercados perto de mim", "lc:pedir")])
+    return tela("\n".join(linhas_txt), botoes + voltar, editar)
+
+
+def onde_comprar_mercado(m, editar: bool = True) -> Saida:
+    """Os itens da lista num mercado: '🔥 promoção (até dd/mm)' ou '≈ estimado'."""
+    linhas_txt = [f"🏪 *{m.nome}*: {brl(m.total)}{_km(m.distancia_km)}", ""]
+    for item in m.itens:
+        if item.promocao:
+            p = item.promocao
+            condicao = f", {p['condicao']}" if p.get("condicao") else ""
+            linhas_txt.append(f"• {item.nome}: {brl(item.custo)} 🔥 promoção (até {data_br(p['validade'])}{condicao})")
+        else:
+            linhas_txt.append(f"• {item.nome}: ≈ {brl(item.custo)} estimado")
+    botoes = [[Botao(f"✅ Vou comprar no {m.nome}", f"oc:e:{chave_mercado(m.nome)}")],
+              [Botao("⬅️ Voltar", "oc:ver")]]
+    return tela("\n".join(linhas_txt), botoes, editar)
+
+
+# --- 📍 Mercados próximos (C12) ------------------------------------------------------------
+def pedir_localizacao() -> Saida:
+    return Saida(tipo="pedir_localizacao",
+                 texto="Toque no botão *📍 Enviar minha localização* aqui embaixo. Uso só para achar os "
+                       "mercados perto de você (e dá para apagar tudo com /esquecer).")
+
+
+def mercados_proximos(mercados: list, redes_com_promo: set[str], raio_m: int, tem_plano: bool) -> Saida:
+    from restricoes import normalizar
+    raio = f"{raio_m / 1000:g}".replace(".", ",")
+    botoes = ([[Botao("🏪 Onde comprar", "oc:ver")]] if tem_plano else []) + [[Botao("🔥 Promoções", "pr:ver")]]
+    if not mercados:
+        return tela(f"📍 Não achei supermercados num raio de {raio} km 😕 O mapa (OpenStreetMap) é feito pelas "
+                    "pessoas e pode estar incompleto.", botoes)
+    linhas_txt = [f"📍 *Mercados perto de você* (até {raio} km)", ""]
+    for i, m in enumerate(mercados, 1):
+        promo = " · 🔥 *tem promoções*" if m.rede and normalizar(m.rede) in redes_com_promo else ""
+        linhas_txt += [f"{i}. *{m.nome}*{_km(m.distancia_km)}{promo}", f"   {m.link}"]
+    linhas_txt += ["", "Distância em linha reta. Mapa: © colaboradores do OpenStreetMap."]
+    return tela("\n".join(linhas_txt), botoes)
