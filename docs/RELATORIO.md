@@ -1,7 +1,7 @@
 # Rende: relatório final do Pedido H/I (PARTE F), 24/11/2026
 
 Situação item a item no [PLANO.md](../PLANO.md); histórico no [CONTEXTO.md](../CONTEXTO.md).
-Testes automáticos: **281 de 281 OK** (`.venv\Scripts\python testes\testar.py`), sem chamar IA,
+Testes automáticos: **337 de 337 OK** (com o PR #2) (`.venv\Scripts\python testes\testar.py`), sem chamar IA,
 Telegram, sites ou mapas de verdade.
 
 ## 1. O que funciona
