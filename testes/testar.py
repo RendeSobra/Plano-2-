@@ -1520,8 +1520,42 @@ banco.registrar_uso_ia(provedor="claude", nivel="sonnet", modelo="claude-modelo-
 texto_aviso = atendimento.custos()[0].texto
 ok("Sem preço de tabela para claude-modelo-que-nao-existe" in texto_aviso,
    "modelo sem preço de tabela é avisado (o custo dele entra como zero)")
-ok("Cache do Claude gravou" in texto_aviso,
-   "cache que grava mais do que lê é avisado (gravar custa 1,25x a entrada)")
+ok("Cache do Claude gravou" not in texto_aviso, "modelo sem preço não entra na conta do cache")
+ok(roteador.saldo_cache("claude-sonnet-5-5", 0, 10_000) < 0 < roteador.saldo_cache("claude-sonnet-5-5", 5_000, 10_000),
+   "cache: gravou 10 mil e não leu = prejuízo; gravou 10 mil e leu 5 mil = já economizou (gravar custa só 25% a mais)")
+banco.registrar_uso_ia(provedor="claude", nivel="sonnet", modelo="claude-sonnet-5-5",
+                       tarefa="conversa", motivo="teste", tokens_entrada=100, tokens_saida=50,
+                       cache_leitura=0, cache_escrita=90_000, custo_usd=0.0, cobrada=True, escalonou_por=None)
+texto_aviso = atendimento.custos()[0].texto
+ok("Cache do Claude gravou" in texto_aviso and "a mais do que economizou" in texto_aviso,
+   "cache que custa mais do que economiza é avisado, com o valor")
+ok(roteador.max_tokens("midia") == 16000 and roteador.max_tokens("conversa") == 8000,
+   "foto de encarte (mídia) tem teto de 16 mil tokens: a lista de ofertas não é cortada")
+
+
+class _CtxFalso:
+    bot = None
+
+
+async def _botao_com_erro():
+    consulta = _ConsultaFalsa()
+    original = atendimento.acao
+
+    async def quebra(usuario, acao):
+        raise RuntimeError("falha de teste")
+    atendimento.acao = quebra
+    try:
+        await bot_telegram.executar_acao(_CtxFalso(), 1, "u-erro", "pl:dia", consulta=consulta)
+    except RuntimeError:
+        pass
+    finally:
+        atendimento.acao = original
+    await asyncio.sleep(0.05)
+    return consulta.respostas
+
+
+ok(asyncio.run(_botao_com_erro()) == [(None, False)],
+   "erro inesperado num botão: o toque é confirmado (o botão não fica girando) e o erro segue para o aviso")
 
 print(f"\n{total - len(falhas)} de {total} testes OK" + (f"\nFALHARAM: {falhas}" if falhas else ""))
 sys.exit(1 if falhas else 0)

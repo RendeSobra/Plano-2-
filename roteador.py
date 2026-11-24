@@ -61,8 +61,11 @@ TAREFAS_ESFORCO_MEDIO = {"troca", "cardapio", "complexo", "otimizar_lista"}
 # escreve —, mas a Anthropic reserva o teto na conta de tokens por minuto: pedir 32 mil para
 # responder "oi" tira folga de limite de todo mundo. O cardápio continua com o teto alto porque
 # em 24/11 o Sonnet chegou a usar 16 mil (raciocínio + JSON) e a resposta saiu cortada.
-MAX_TOKENS_TAREFA = {"cardapio": 32000, "complexo": 16000, "otimizar_lista": 16000, "troca": 16000}
-MAX_TOKENS_PADRAO = 8000  # conversa, cadastro, mídia, receita, encarte
+# Mídia também tem teto alto: a foto de um encarte vira uma chamada de ferramenta com até 80
+# ofertas, e 8 mil tokens (somados ao raciocínio) podiam cortar a lista no meio.
+MAX_TOKENS_TAREFA = {"cardapio": 32000, "complexo": 16000, "otimizar_lista": 16000, "troca": 16000,
+                     "midia": 16000}
+MAX_TOKENS_PADRAO = 8000  # conversa, cadastro, receita
 _CLAUDE = {"haiku": ("CLAUDE_MODELO_BARATO", "claude-haiku-5-5", "LIMITE_HAIKU_DIA", 500),
            "sonnet": ("CLAUDE_MODELO_PADRAO", "claude-sonnet-5-5", "LIMITE_SONNET_DIA", 100),
            "opus": ("CLAUDE_MODELO_FORTE", "claude-opus-5-5", "LIMITE_OPUS_DIA", 20)}
@@ -80,6 +83,18 @@ def custo_usd(modelo: str, entrada: int, saida: int, cache_leitura: int = 0, cac
     p_entrada, p_saida, p_cache = preco
     return (entrada * p_entrada + cache_escrita * p_entrada * ESCRITA_CACHE
             + cache_leitura * p_cache + saida * p_saida) / 1_000_000
+
+
+def saldo_cache(modelo: str, cache_leitura: int, cache_escrita: int) -> float:
+    """Quanto o cache economizou, em US$ (negativo: custou mais do que economizou).
+    Gravar custa ESCRITA_CACHE vezes a entrada (o que passa de 1x é o custo extra); cada token
+    lido do cache custa o preço de cache em vez do de entrada. Compensa quando as leituras
+    passam de ~27% das gravações, não só quando lê mais do que grava."""
+    preco = PRECOS.get(modelo)
+    if not preco:
+        return 0.0
+    p_entrada, _, p_cache = preco
+    return (cache_leitura * (p_entrada - p_cache) - cache_escrita * p_entrada * (ESCRITA_CACHE - 1)) / 1_000_000
 
 
 def claude(nome: str) -> Nivel:

@@ -668,7 +668,8 @@ def custos() -> list[Saida]:
     def avisos_do_mes(linhas: list[dict]) -> list[str]:
         """Duas armadilhas silenciosas: modelo sem preço de tabela (custo contado como zero) e
         cache que custa mais do que rende (gravar vale 1,25x a entrada e dura 5 min: num bot de
-        pouco movimento, cada conversa grava e quase nunca lê de volta)."""
+        pouco movimento, cada conversa grava e quase nunca lê de volta). A conta do cache é em
+        dinheiro, com os preços da tabela (roteador.saldo_cache)."""
         avisos = []
         sem_preco = sorted({l["modelo"] for l in linhas if l["modelo"] not in roteador.PRECOS})
         if sem_preco:
@@ -676,9 +677,11 @@ def custos() -> list[Saida]:
                           f"essas chamadas entram como US$ 0 (atualize PRECOS no roteador.py).")
         gravado = sum(l["cache_escrita"] or 0 for l in linhas)
         lido = sum(l["cache_leitura"] or 0 for l in linhas)
-        if gravado and lido < gravado:
-            avisos.append(f"⚠️ Cache do Claude gravou {_mil(gravado)} e leu só {_mil(lido)}: "
-                          f"com pouco movimento ele está custando mais do que economiza.")
+        saldo = sum(roteador.saldo_cache(l["modelo"], l["cache_leitura"] or 0, l["cache_escrita"] or 0)
+                    for l in linhas)
+        if saldo < 0:
+            avisos.append(f"⚠️ Cache do Claude gravou {_mil(gravado)} e leu só {_mil(lido)}: este mês ele "
+                          f"custou {dolar(-saldo)} a mais do que economizou (pouco movimento).")
         return avisos
 
     linhas = ["💸 *Custos de IA*", ""] + bloco(f"Hoje ({telas.data_br(hoje)})", hoje) + [""] + bloco("Este mês", mes)

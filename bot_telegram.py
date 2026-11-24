@@ -339,8 +339,12 @@ async def executar_acao(context: ContextTypes.DEFAULT_TYPE, chat_id: int, usuari
     else:
         relogio = asyncio.get_running_loop().time
         t0 = relogio()
-        async with _digitando(context.bot, chat_id):
-            saidas = await atendimento.acao(usuario, acao)
+        try:
+            async with _digitando(context.bot, chat_id):
+                saidas = await atendimento.acao(usuario, acao)
+        except Exception:
+            _confirmar_toque(consulta)  # tira o relógio do botão; o erro segue para o ao_dar_erro
+            raise
         # O trabalho leva ~1 ms, então dá para confirmar o toque já sabendo o que dizer no toast
         t1 = relogio()
         _confirmar_toque(consulta, saidas)
