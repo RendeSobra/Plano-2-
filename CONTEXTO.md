@@ -77,6 +77,13 @@ por texto, áudio e foto, e uma escada de modelos de IA que sobe de nível só q
     sem modo de preparo e Sonnet com effort "low". Rodada real: US$ 0,053 (antes US$ 0,131
     só no Sonnet), mas o plano estourou o orçamento por escolher embalagens grandes demais;
     regras corrigidas, nova medição pendente (tabela "Custo do cardápio" no PLANO.md).
+11. **Pedido I, continuação (24/11):** C10, C9/C11 + Modo mercado, C6, C2 e C3 feitos e
+    enviados ao GitHub depois que o dono trocou as 3 chaves. **C13:** pesquisa das 10 redes
+    (tabela no PLANO.md); escolhidas Prezunic, Atacadão e Dia a Dia; coletor com boa conduta
+    e coleta real (305 ofertas, US$ 0,19). **C14:** avisos de promoção (1 por dia), resumo
+    semanal, `/avisos`, `/promo`, limpeza das vencidas e preferência às promoções no cardápio.
+    **C15:** "Onde comprar" com total por mercado, divisão (R$ 15+) e PDF separado por mercado.
+    O dono testou o cardápio no celular: Sonnet reprovado no orçamento, Opus refez (US$ 0,42).
 
 ## 3. Arquitetura (cada arquivo com um papel)
 
@@ -96,11 +103,18 @@ por texto, áudio e foto, e uma escada de modelos de IA que sobe de nível só q
 | `mercado.py` | 🛒 Modo mercado: marcar o que foi para o carrinho, preço pago, "Terminei as compras" (despensa e "não encontrei") |
 | `banco.py` | Único acesso a dados. SQLite `rende.db` (fora do Git). Para ir ao Supabase, reescrever só ele |
 | `escopo.py` | C3: filtro rápido do que é de fora, leitura do campo "no_escopo" e mensagens fixas |
-| `prompts.py` | Personalidade (a mesma para Gemini e Claude), instruções de plano/troca/receita, mensagens fixas |
+| `prompts.py` | Personalidade (a mesma para Gemini e Claude), instruções de plano/troca/receita/encarte, mensagens fixas |
+| `promocoes.py` | Guarda ofertas de qualquer origem com as conferências (preço, validade, sem repetir) e normaliza nome/marca/tamanho; compara item da lista com promoção |
+| `coletor/` | C13: um arquivo por rede (Prezunic, Atacadão, Dia a Dia), `web.py` (robots.txt, 5 s por site), `extrair.py` (Gemini). `python -m coletor` |
+| `avisos.py` | C14: quem recebe aviso de promoção e resumo semanal (o canal só entrega), `/avisos` |
+| `onde_comprar.py` | C15: total da lista por mercado, divisão entre 2 mercados, condições |
+| `mercados_proximos.py` | C12: supermercados perto (Overpass/OpenStreetMap), distância, link do Google Maps |
 
 Tabelas: `usuarios`, `historico` (30 últimas), `planos` (3 últimos; o mais novo é o atual; o
-progresso do Modo mercado fica dentro dele), `promocoes`, `precos` (preços vistos de verdade,
-sem dizer quem informou), `uso_diario`, `uso_ia` (custo por chamada, sem texto de conversa nem usuário).
+progresso do Modo mercado e a escolha do "Onde comprar" ficam dentro dele), `promocoes`, `precos`
+(preços vistos de verdade, sem dizer quem informou), `encartes` (hash dos encartes já lidos pelo
+coletor), `estado` (marcadores do robô, ex.: última promoção avisada), `uso_diario`, `uso_ia`
+(custo por chamada, sem texto de conversa nem usuário).
 
 ## 4. Decisões importantes
 
@@ -191,7 +205,7 @@ A ordem agora é a da PARTE D do Pedido H (lista completa e situação de cada i
 5. **C13 Fase 2 + C14:** coletor das redes aprovadas; `/promo`, `/avisos`, avisos pelo
    JobQueue (máx. 1 por dia), resumo semanal (padrão sábado 9h), apagar promoções vencidas.
 6. **C15:** "Onde comprar" (total por mercado, 3 melhores, divisão só se economizar R$ 15+).
-7. **C12:** mercados próximos pelo Overpass (OpenStreetMap), raio de 3 km, até 8 mercados.
+7. **C12:** mercados próximos pelo Overpass (OpenStreetMap), raio de 3 km, até 8 mercados na tela (a loja mais perto de cada rede com promoção sempre entra; o "Onde comprar" usa todas as do raio).
    Teste com um ponto público de Goiânia (não o GPS do dono).
 8. **Testes no celular (PARTE E)**, com o custo estimado avisado antes. Inclui o que ficou
    do Pedido A: foto de geladeira e de nota fiscal.

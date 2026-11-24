@@ -144,8 +144,9 @@ pratos da semana passada, salvo os favoritos; nunca use os rejeitados.
 tropeiro na quarta; o frango assado vira recheio de tapioca). Marmita pode ser a sobra \
 planejada do jantar.
 6. Use primeiro o que já está na despensa (o item entra em "compras" do mesmo jeito: o \
-sistema desconta o que a pessoa já tem). Use promoções quando fizer sentido, com o \
-preço exato da promoção para aquela embalagem.
+sistema desconta o que a pessoa já tem). Dê preferência aos ingredientes em promoção \
+(lista no pedido, dos mercados da pessoa) quando couberem no orçamento, sem repetir \
+pratos e sem quebrar as restrições; use o preço exato da promoção para aquela embalagem.
 7. Orçamento: o total das embalagens precisa caber no orçamento da semana; mire entre \
 85% e 95% dele. Pense por refeição: o pedido diz quanto dá, em média, por refeição. \
 Compre a MENOR embalagem que cubra o que a semana usa (açúcar 1 kg se a semana usa \
@@ -178,6 +179,16 @@ brasileiras de cozinha com o peso entre parênteses quando ajudar ("2 xícaras d
 bater com os ingredientes; use só os equipamentos informados.
 - tempo_min: tempo total realista. dica: uma dica curta de economia ou de sobra.
 Nunca use ingrediente das restrições.
+"""
+
+EXTRAIR_ENCARTE = """Você lê o encarte (folheto de ofertas) de um supermercado de Goiânia e devolve só o JSON pedido. Leia TODAS as páginas.
+- Inclua só alimentos, bebidas, produtos de limpeza e de higiene. Ignore eletrônicos, roupas, utensílios, brinquedos e "bazar".
+- produto: nome genérico, curto e em minúsculas, sem marca e sem tamanho ("arroz", "feijão carioca", "óleo de soja", "leite integral", "peito de frango", "banana prata").
+- marca: só a marca ("Tio João"); vazio se não houver. tamanho: a embalagem ("5 kg", "900 ml", "1 L", "30 un"); carne, frios e hortifrúti vendidos a granel: "1 kg".
+- preco: o preço de UMA unidade para quem compra no varejo, em reais (número). Se o encarte mostrar também preço de atacado ("a partir de 6 un R$ 4,49"), ponha isso em condicao. preco_anterior: o preço "de" riscado, se aparecer.
+- condicao: o que limita a oferta, em poucas palavras: "no cartão da loja", "leve 3 pague 2", "só no app", "clube/sócio", "preço por kg", "a partir de 6 un R$ 4,49". Vazio se não houver.
+- validade: o último dia da oferta (AAAA-MM-DD) só quando a oferta tiver data própria diferente do encarte; validade_inicio e validade_fim do encarte inteiro, se aparecerem.
+- Nunca invente: preço ou produto que não dá para ler fica de fora.
 """
 
 # =============================================================================
@@ -221,5 +232,5 @@ FORA_DO_ESCOPO = [
 ]
 SEM_PROMOCOES = ("Ainda não tenho promoções cadastradas para a sua cidade 😕 Se tiver um encarte de mercado, "
                  "manda a foto que eu guardo as ofertas 📸")
-COMANDO_DESCONHECIDO = "Não conheço esse comando. Use /start, /perfil, /novo ou /esquecer."
+COMANDO_DESCONHECIDO = "Não conheço esse comando. Use /start, /perfil, /novo, /avisos ou /esquecer."
 SO_ADMIN = "Esse comando é só para administradores."

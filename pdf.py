@@ -64,6 +64,22 @@ def _marca(pdf: FPDF, plano: dict, linha: dict, promo: dict | None, largura: flo
     pdf.set_x(x + largura)
 
 
+def _grupos(plano: dict) -> list[tuple[str | None, dict]]:
+    """(título do grupo, linha) na ordem do PDF. Compra dividida entre mercados (C15): um grupo
+    por mercado, com o subtotal no título; senão, um grupo só, sem título."""
+    linhas = mercado.linhas(plano)
+    escolhidos = (plano.get("onde_comprar") or {}).get("mercados") or []
+    if len(escolhidos) < 2:
+        return [(f"Mercado: {escolhidos[0]}" if escolhidos else None, l) for l in linhas]
+    saida = []
+    for i, nome in enumerate(escolhidos):
+        do_mercado = [l for l in linhas if (mercado.escolha(plano, l) or {}).get("mercado") == nome
+                      or (i == 0 and mercado.escolha(plano, l) is None)]
+        subtotal = sum(mercado.custo_linha(plano, l) for l in do_mercado)
+        saida += [(f"Comprar no {nome} ({brl(subtotal)})", l) for l in do_mercado]
+    return saida
+
+
 def _pagina(plano: dict, perfil: dict) -> tuple[bytes, list[tuple], float]:
     """Desenha o PDF (fpdf2). Devolve (pdf, caixinhas [(página, x, y, nome)], altura da página em mm)."""
     pdf = FPDF(format="A4")
@@ -82,13 +98,20 @@ def _pagina(plano: dict, perfil: dict) -> tuple[bytes, list[tuple], float]:
 
     caixas: list[tuple] = []
     secao = None
-    for linha in mercado.linhas(plano):
+    grupo = None
+    for titulo_grupo, linha in _grupos(plano):
         promo = promocao_da_linha(plano, linha)
         altura = 7 + (5 if promo else 0)
-        if linha["secao"] != secao:
-            altura += 10
+        if linha["secao"] != secao or titulo_grupo != grupo:
+            altura += 10 + (12 if titulo_grupo != grupo else 0)
         if pdf.will_page_break(altura):  # a caixinha e o item ficam na mesma página
             pdf.add_page()
+        if titulo_grupo != grupo:  # C15/C11: compra dividida, uma parte por mercado
+            grupo, secao = titulo_grupo, None
+            pdf.ln(3)
+            pdf.set_font("Helvetica", "B", 15)
+            pdf.set_text_color(*VERDE)
+            pdf.cell(0, 9, _txt(titulo_grupo), new_x="LMARGIN", new_y="NEXT")
         if linha["secao"] != secao:
             secao = linha["secao"]
             pdf.ln(2)
