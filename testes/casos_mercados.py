@@ -68,10 +68,19 @@ def _rodar(ok, novo_banco, criar_usuario, plano_valido) -> None:
     falsa = _instalar([200])
     achados = asyncio.run(mp.buscar(*PRACA_CIVICA))
     corpo = parse_qs(falsa.pedidos[0].content.decode())["data"][0]
-    ok(len(achados) == 8 and achados == sorted(achados, key=lambda m: m.distancia_km),
-       "até 8 mercados, do mais perto ao mais longe")
+    ok(len(achados) == 11 and achados == sorted(achados, key=lambda m: m.distancia_km),
+       "busca: todos os mercados do raio, do mais perto ao mais longe")
     nomes = [m.nome for m in achados]
     ok(nomes.count("Atacadão") == 1 and all(n for n in nomes), "sem repetir o mesmo mercado e sem os sem nome")
+    ok(nomes[-1] == "Atacadão Dia a Dia", "(cenário: a loja do Dia a Dia é a mais longe, fora das 8 mais perto)")
+    tela = mp.escolher(achados, set())
+    ok(tela == achados[:8], "tela sem rede com promoção: os 8 mais perto")
+    tela = mp.escolher(achados, {"dia a dia"})
+    ok(len(tela) == 8 and tela[-1].nome == "Atacadão Dia a Dia" and tela[:7] == achados[:7]
+       and tela == sorted(tela, key=lambda m: m.distancia_km),
+       "rede com promoção longe: a loja dela entra na tela no lugar do 8º mais perto (achado do teste real)")
+    ok(mp.distancias_por_rede(achados)["dia a dia"] == achados[-1].distancia_km,
+       "'Onde comprar' tem a distância da rede mesmo fora das 8 mais perto")
     ok("around:3000,-16.68,-49.255" in corpo and "-16.67993" not in corpo and '"shop"="wholesale"' in corpo,
        "consulta no raio de 3 km, com a localização arredondada (~100 m), incluindo atacarejos")
     ok(falsa.pedidos[0].headers["user-agent"] == mp.USER_AGENT and "RendeBot" in mp.USER_AGENT,
@@ -105,6 +114,11 @@ def _rodar(ok, novo_banco, criar_usuario, plano_valido) -> None:
        "localização: guarda e mostra os mercados com distância, link e 🔥 nos que têm promoção")
     ok("tem promoções" not in tela.split("Mercadinho Pratiko*")[1].split("\n")[0],
        "mercado sem promoção cadastrada não leva o 🔥")
+    banco.adicionar_promocao(mercado="Dia a Dia", produto="feijão", tamanho="1 kg", preco=6.49, validade=validade,
+                             cidade="Goiânia", origem="site")
+    tela = asyncio.run(atendimento.acao("m1", "lc:ver"))[0].texto
+    ok(tela.count("\n   https://") == 8 and "🔥 *tem promoções*" in tela.split("Atacadão Dia a Dia*")[1].split("\n")[0],
+       "no bot: a loja da rede com promoção aparece mesmo sendo a mais longe (continua 8 na tela)")
 
     plano = plano_valido()
     plano["cesta"], plano["orcamento"] = cesta.calcular(plano, {}), 200.0

@@ -101,11 +101,32 @@ def ler_resposta(dados: dict, lat: float, lon: float) -> list[MercadoProximo]:
                                        distancia_km=round(distancia_km(lat, lon, mlat, mlon), 2),
                                        latitude=mlat, longitude=mlon))
     mercados.sort(key=lambda m: m.distancia_km)
-    return mercados[:MAX_MERCADOS]
+    return mercados  # todos: o "Onde comprar" precisa da loja de cada rede, mesmo fora das 8 mais perto
+
+
+def escolher(mercados: list[MercadoProximo], redes_com_promo: set[str],
+             maximo: int = MAX_MERCADOS) -> list[MercadoProximo]:
+    """Os que vão para a tela: a loja mais perto de cada rede com promoção (mesmo que não esteja
+    entre as 8 mais perto) e o resto pelos mais perto, até `maximo`, do mais perto ao mais longe."""
+    escolhidos, redes = [], set()
+    for m in mercados:  # já vêm do mais perto ao mais longe
+        rede = restricoes.normalizar(m.rede) if m.rede else None
+        if rede in redes_com_promo and rede not in redes:
+            redes.add(rede)
+            escolhidos.append(m)
+    escolhidos = escolhidos[:maximo]
+    ja = {id(m) for m in escolhidos}
+    for m in mercados:
+        if len(escolhidos) >= maximo:
+            break
+        if id(m) not in ja:
+            escolhidos.append(m)
+    return sorted(escolhidos, key=lambda m: m.distancia_km)
 
 
 async def buscar(latitude: float, longitude: float, raio: int | None = None) -> list[MercadoProximo]:
-    """Até 8 mercados no raio, do mais perto ao mais longe. Levanta ErroMapa se a Overpass falhar."""
+    """Todos os mercados no raio, do mais perto ao mais longe (a tela usa `escolher`).
+    Levanta ErroMapa se a Overpass falhar."""
     raio = raio or raio_m()
     lat, lon = round(latitude, 3), round(longitude, 3)  # ~100 m: não manda o ponto exato da pessoa
     chave = (lat, lon, raio)

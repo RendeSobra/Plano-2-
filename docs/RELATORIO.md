@@ -1,7 +1,7 @@
 # Rende: relatório final do Pedido H/I (PARTE F), 24/11/2026
 
 Situação item a item no [PLANO.md](../PLANO.md); histórico no [CONTEXTO.md](../CONTEXTO.md).
-Testes automáticos: **276 de 276 OK** (`.venv\Scripts\python testes\testar.py`), sem chamar IA,
+Testes automáticos: **281 de 281 OK** (`.venv\Scripts\python testes\testar.py`), sem chamar IA,
 Telegram, sites ou mapas de verdade.
 
 ## 1. O que funciona
@@ -17,7 +17,7 @@ Telegram, sites ou mapas de verdade.
 | **Coletor (C13)** | Prezunic, Atacadão e Dia a Dia; boa conduta; só Gemini; hash; aviso ao admin; 6h + `/coletar` | Testes + **coleta real: 305 ofertas, US$ 0,19** |
 | **Promoções e avisos (C14)** | Aviso de promoção da lista (1/dia, 8h–21h, respeita restrições), resumo semanal, `/avisos`, `/promo`, limpeza; cardápio prefere promoções de comida | Testes (celular: falta) |
 | **Onde comprar (C15)** | Total por mercado, 3 melhores, % com preço real, condições, divisão só com R$ 15+; a escolha vale na lista, no PDF e no Modo mercado | Testes (celular: falta) |
-| **Mercados próximos (C12)** | Overpass, 3 km, até 8, distância, Google Maps, 🔥 nas redes com promoção | Testes; teste real bloqueado pela Overpass lotada |
+| **Mercados próximos (C12)** | Overpass, 3 km, até 8, distância, Google Maps, 🔥 nas redes com promoção | Testes + **teste real: 8 mercados em 30 s** (tarde de 24/11) |
 
 ## 2. O que não funciona (ou não foi provado) e por quê
 
@@ -25,9 +25,10 @@ Telegram, sites ou mapas de verdade.
    "low" custa US$ 0,05, mas foi **reprovado nos dois testes reais** (23/11 alergia; 24/11 passou
    R$ 78,80 de R$ 180), e o Opus refez por US$ 0,20–0,38. Perfil com 3+ restrições vai direto ao
    Opus (US$ 0,43). **Custo médio real: US$ 0,39 por cardápio; Opus em 100% (3 de 3).**
-2. **Mercados próximos sem teste real:** em 24/11 a Overpass principal respondeu "servidor lotado"
-   (502) e o espelho não respondeu em 65 s. O código trata (mensagem + [🔄 Tentar de novo]), mas o
-   resultado real precisa ser visto no celular.
+2. **Mercados próximos dependem da Overpass:** de manhã ela respondeu "servidor lotado" (502); à
+   tarde achou 8 mercados em 30 s. Quando falha, o bot avisa e oferece [🔄 Tentar de novo]. O teste real
+   mostrou que as lojas das redes com promoção podiam ficar de fora das 8 mais perto (corrigido: entram
+   no lugar das últimas). O mapa é feito por voluntários e pode faltar mercado.
 3. **Gemini 3.5 Flash-Lite deu 503 (sobrecarga) em todas as chamadas do coletor em 24/11**; o
    reserva (3.6 Flash, ~2,5x mais caro) fez o trabalho. Se continuar, vale inverter a ordem no `.env`.
 4. **Ofertas "com clube" do Prezunic** (a maioria): o preço exige cadastro no clube. Aparecem como

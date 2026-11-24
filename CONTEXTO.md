@@ -205,7 +205,7 @@ A ordem agora é a da PARTE D do Pedido H (lista completa e situação de cada i
 5. **C13 Fase 2 + C14:** coletor das redes aprovadas; `/promo`, `/avisos`, avisos pelo
    JobQueue (máx. 1 por dia), resumo semanal (padrão sábado 9h), apagar promoções vencidas.
 6. **C15:** "Onde comprar" (total por mercado, 3 melhores, divisão só se economizar R$ 15+).
-7. **C12:** mercados próximos pelo Overpass (OpenStreetMap), raio de 3 km, até 8 mercados.
+7. **C12:** mercados próximos pelo Overpass (OpenStreetMap), raio de 3 km, até 8 mercados na tela (a loja mais perto de cada rede com promoção sempre entra; o "Onde comprar" usa todas as do raio).
    Teste com um ponto público de Goiânia (não o GPS do dono).
 8. **Testes no celular (PARTE E)**, com o custo estimado avisado antes. Inclui o que ficou
    do Pedido A: foto de geladeira e de nota fiscal.

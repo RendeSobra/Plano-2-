@@ -216,8 +216,9 @@ async def _mercados_perto(usuario: str) -> list[Saida]:
                            [[Botao("🔄 Tentar de novo", "lc:ver")]])]
     cidade = perfil.get("cidade") or promocoes.CIDADE_PADRAO
     com_promo = {restricoes.normalizar(p["mercado"]) for p in banco.promocoes_validas(cidade=cidade, limite=5000)}
-    log.info("Mercados próximos: %d encontrados.", len(achados))
-    return [telas.mercados_proximos(achados, com_promo, mercados_proximos.raio_m(),
+    na_tela = mercados_proximos.escolher(achados, com_promo)
+    log.info("Mercados próximos: %d no raio, %d na tela.", len(achados), len(na_tela))
+    return [telas.mercados_proximos(na_tela, com_promo, mercados_proximos.raio_m(),
                                     banco.plano_atual(usuario) is not None)]
 
 
