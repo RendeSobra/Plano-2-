@@ -165,8 +165,27 @@ async def _enviar_texto(bot, chat_id: int, texto: str, teclado=None) -> Message 
 # edições são juntadas: só o estado final é desenhado. Protege do limite de edições do
 # Telegram e deixa a tela mais fluida — um toque isolado não espera nada.
 INTERVALO_MINIMO_EDICAO = 0.4
+# Quando o Telegram pede para esperar (limite de edições), o Rende espera e redesenha o estado
+# final, para a tela não ficar mostrando o ✅/⬜ de antes. Pedido maior que isto não segura a
+# tarefa: a tela fica como está até o próximo toque (que já leva o estado atual).
+ESPERA_MAXIMA_LIMITE = 10.0
+# Os controles abaixo só importam por alguns segundos depois de cada edição; os mais velhos que
+# isto são apagados, senão guardariam uma entrada por mensagem editada para sempre.
+GUARDAR_EDICAO_SEGUNDOS = 60.0
 _ultima_edicao: dict[tuple[int, int], float] = {}
 _versao_edicao: dict[tuple[int, int], int] = {}
+_dormir = asyncio.sleep  # os testes trocam para não esperar de verdade
+
+
+def _segundos(valor) -> float:
+    """RetryAfter.retry_after vem em segundos (int) ou como timedelta, conforme a configuração do PTB."""
+    return valor.total_seconds() if hasattr(valor, "total_seconds") else float(valor)
+
+
+def _esquecer_edicoes_antigas(agora: float) -> None:
+    for chave in [c for c, quando in _ultima_edicao.items() if agora - quando > GUARDAR_EDICAO_SEGUNDOS]:
+        _ultima_edicao.pop(chave, None)
+        _versao_edicao.pop(chave, None)
 
 
 async def _editar(mensagem: Message, texto: str, teclado=None) -> bool:
@@ -182,12 +201,24 @@ async def _editar(mensagem: Message, texto: str, teclado=None) -> bool:
         if _versao_edicao.get(chave) != minha_vez:
             return True  # chegou um toque mais novo: ele desenha o estado final
     _ultima_edicao[chave] = relogio()
+    if len(_ultima_edicao) > 200:
+        _esquecer_edicoes_antigas(relogio())
+    html_texto = para_html(texto)
     try:
-        await mensagem.edit_text(para_html(texto), parse_mode=ParseMode.HTML, reply_markup=teclado)
+        await mensagem.edit_text(html_texto, parse_mode=ParseMode.HTML, reply_markup=teclado)
         return True
-    except RetryAfter as erro:  # limite de edições do Telegram: a próxima edição já leva o estado atual
-        log.warning("O Telegram pediu para esperar %.0f s antes de editar de novo.", erro.retry_after)
-        _ultima_edicao[chave] = relogio() + float(erro.retry_after)
+    except RetryAfter as erro:  # limite de edições do Telegram
+        espera = _segundos(erro.retry_after)
+        log.warning("O Telegram pediu para esperar %.0f s antes de editar de novo.", espera)
+        _ultima_edicao[chave] = relogio() + espera
+        if espera > ESPERA_MAXIMA_LIMITE:
+            return True  # longo demais para segurar: o próximo toque já leva o estado atual
+        await _dormir(espera)
+        if _versao_edicao.get(chave) != minha_vez:
+            return True  # um toque mais novo já vai desenhar o estado final
+        _ultima_edicao[chave] = relogio()
+        with contextlib.suppress(TelegramError):  # inclui "not modified"
+            await mensagem.edit_text(html_texto, parse_mode=ParseMode.HTML, reply_markup=teclado)
         return True
     except BadRequest as erro:
         if "not modified" in str(erro).lower():
