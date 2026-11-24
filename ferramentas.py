@@ -62,9 +62,10 @@ DEFINICOES = [
          "dia": {"type": "string", "enum": _DIAS}, "refeicao": {"type": "string", "enum": _TIPOS},
          "pedido": {"type": "string", "description": "O que a pessoa quer no lugar (ex.: 'algo sem carne')"}}}},
     {"nome": "mostrar",
-     "descricao": "Mostra o resumo do plano, o cardápio (de um dia), a lista de compras ou o PDF da lista.",
+     "descricao": "Mostra o resumo do plano, o cardápio (de um dia), a lista de compras, o PDF da lista ou o "
+                  "Modo mercado (marcar o que já foi para o carrinho, durante as compras).",
      "parametros": {"type": "object", "required": ["o_que"], "properties": {
-         "o_que": {"type": "string", "enum": ["resumo", "cardapio", "lista", "pdf"]},
+         "o_que": {"type": "string", "enum": ["resumo", "cardapio", "lista", "pdf", "mercado"]},
          "dia": {"type": "string", "enum": _DIAS}}}},
     {"nome": "avaliar_prato",
      "descricao": "Guarda a nota (1 a 5) que a pessoa deu para um prato. 4-5 = favorito, 1-2 = não usar mais.",
@@ -156,7 +157,7 @@ def _trocar_prato(ctx: Contexto, dia: str, refeicao: str, pedido: str = "") -> d
 def _mostrar(ctx: Contexto, o_que: str, dia: str | None = None) -> dict:
     if not banco.plano_atual(ctx.usuario):
         return {"erro": "a pessoa ainda não tem plano; ofereça montar um"}
-    acao = {"resumo": "pl:res", "lista": "pl:lista", "pdf": "pl:pdf",
+    acao = {"resumo": "pl:res", "lista": "pl:lista", "pdf": "pl:pdf", "mercado": "mm:ver",
             "cardapio": f"pl:dia:{dia}" if dia else "pl:dia"}[o_que]
     ctx.saidas.append(Saida(tipo="acao", acao=acao))
     return {"ok": True}

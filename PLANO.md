@@ -11,7 +11,7 @@ O **Pedido I** (mesmo arquivo) manda executar os itens pendentes do H numa ordem
 com decisões do dono que valem por cima do H (ver "Decisões do Pedido I").
 Histórico, testes reais e detalhes: [CONTEXTO.md](CONTEXTO.md).
 
-Testes automáticos: `.venv\Scripts\python testes\testar.py` (**145 de 145 OK em 24/11/2026**).
+Testes automáticos: `.venv\Scripts\python testes\testar.py` (**172 de 172 OK em 24/11/2026**).
 
 ## Pedidos e situação
 
@@ -26,7 +26,7 @@ Testes automáticos: `.venv\Scripts\python testes\testar.py` (**145 de 145 OK em
 | F | Escada de modelos: Gemini → Haiku → Sonnet → Opus, limites por modelo, cache, /custos | ✅ Feito e testado no celular (23/11) |
 | G | Mensagens de troca e PDF sem poluir o chat; contexto no GitHub | ✅ Feito |
 | H | Retomada com a especificação completa (PARTES A a F) | 🔧 PARTE A ✅ (24/11). Itens pendentes: ver Pedido I |
-| I | Executar os pendentes do H sem parar entre etapas + Modo mercado + PDF com caixinhas | 🔧 Custo do cardápio ✅ · C10 ✅ (24/11). Próximo: C9, C11 e Modo mercado |
+| I | Executar os pendentes do H sem parar entre etapas + Modo mercado + PDF com caixinhas | 🔧 Custo do cardápio ✅ · C10 ✅ · C9, C11 e Modo mercado ✅ (24/11). Próximo: C6 |
 
 ## Pedido H: situação de cada item da PARTE C (conferido em 24/11/2026)
 
@@ -40,9 +40,9 @@ Testes automáticos: `.venv\Scripts\python testes\testar.py` (**145 de 145 OK em
 | C6 Entender qualquer mensagem | 🟡 | Foto de encarte não salva as ofertas (origem "usuario"). Localização só é guardada. Arquivo de áudio (que não seja mensagem de voz) não é aceito |
 | C7 Cadastro | ✅ | — |
 | C8 "Montando seu plano" | ✅ | — |
-| C9 Resultado | 🟡 | Falta o botão "🏪 Onde comprar" (depende do C15); textos dos botões diferentes do pedido |
+| C9 Resultado | ✅ (24/11) | Texto e botões como no pedido ([📅 Ver cardápio] [🛒 Lista] [📄 PDF] [🔄 Refazer]) + [🛒 Modo mercado]. Falta só o [🏪 Onde comprar], que entra com o C15 |
 | C10 Conferências em código | ✅ (24/11) | Feito no Pedido I: pratos que costumam levar o ingrediente proibido são barrados pelo nome (purê, strogonoff, empadão, lasanha, escondidinho, pamonha, feijoada, galinhada, vatapá...), salvo a versão segura escrita no nome ("sem lactose", "vegetariano"); 2 ou mais pratos repetidos da semana passada (fora favoritos) fazem refazer, 1 é só aviso; plano acima do orçamento é entregue com o aviso e os botões [Tirar lanches] [Aumentar para R$ X] [Pratos mais simples], e o cadastro avisa quando o orçamento fica abaixo de 75% da sugestão; a receita guarda as porções e é refeita na nova proporção se a família mudar (a lista não muda sozinha). Alergia no registro é reconhecida pelo rótulo "(Lactose)", não pela palavra solta |
-| C11 PDF | 🟡 | Falta "≈ estimado" em cada item (hoje é nota no rodapé), a marca "🔥 promoção (mercado, até dd/mm)" e a separação por mercado. A fonte padrão (Helvetica) não desenha emoji |
+| C11 PDF | ✅ (24/11) | Cada item com "≈ estimado", "PROMOÇÃO (mercado, até dd/mm)" ou "preço pago" (Modo mercado); caixinhas clicáveis (AcroForm, via pypdf: a fpdf2 2.9 só cria campo de assinatura) por cima do quadradinho desenhado, que sai na impressão; dica do Modo mercado no fim; o PDF nunca vai para o disco. As fontes padrão não têm emoji: as marcas são texto e o "≈" usa a fonte Symbol. Falta separar por mercado quando a compra for dividida (vem com o C15) |
 | C12 Mercados próximos | ❌ | Não começado |
 | C13 Coletor | ❌ | Não começado. Fase 1 (pesquisa) **para e espera aprovação** |
 | C14 Promoções e avisos | ❌ quase tudo | Existem a tabela `promocoes` e o liga/desliga pela conversa. Faltam `/promo`, `/avisos`, avisos pelo JobQueue, resumo semanal e limpeza das vencidas |
@@ -55,8 +55,8 @@ Sem parar entre os itens; resumo curto ao fim de cada C.
 1. ✅ PARTE A do H: ler tudo, segurança, resumo (24/11).
 2. ✅ **Custo do cardápio** (24/11): JSON compacto sem modo de preparo; medição antes/depois.
 3. ✅ C10 (conferências), incluindo a lacuna 3 (plano acima do orçamento) (24/11).
-4. ⏳ **Próximo:** C9, C11 e **Modo mercado** (marcar o que já foi comprado; PDF com caixinhas clicáveis).
-5. C6 (entender qualquer mensagem).
+4. ✅ C9, C11 e **Modo mercado** (marcar o que já foi comprado; PDF com caixinhas clicáveis).
+5. ⏳ **Próximo:** C6 (entender qualquer mensagem).
 6. C2 (escada de modelos).
 7. C3 (escopo).
 8. C13 Fases 1 e 2 (o Claude escolhe as redes pelos critérios do dono; não para).
@@ -102,7 +102,12 @@ próprio Sonnet corrigir o orçamento antes de chamar o Opus (decisão do dono).
 - Cardápio em JSON compacto sem modo de preparo; meta de custo: Sonnet sozinho abaixo de US$ 0,08.
 - C13: o Claude escolhe as redes (loja em Goiânia hoje, ofertas sem login, robots.txt e termos
   permitem) e já faz a Fase 2 para até 5; as outras ficam como "candidatas a parceria".
-- Novo: 🛒 Modo mercado e PDF com caixinhas clicáveis (texto completo no Pedido I).
+- Novo: 🛒 Modo mercado e PDF com caixinhas clicáveis (texto completo no Pedido I). Feito em 24/11:
+  `mercado.py` (progresso guardado no plano, campo "mercado"; /esquecer apaga junto), tabela `precos`
+  (preço informado, origem "usuario", sem dizer quem informou), campo `usuarios.aguardando` (o próximo
+  número escrito é o preço). [🏁 Terminei]: o comprado vai para a despensa (o que tem em casa agora),
+  o resto vira "não encontrei" com substitutos simples (sem IA, respeitando as restrições) e botões para
+  trocar os pratos afetados; a troca evita e reprova o item que faltou.
 
 ## Regras de trabalho (PARTE B)
 

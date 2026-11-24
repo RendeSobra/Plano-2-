@@ -9,6 +9,7 @@ from dataclasses import dataclass, field
 from datetime import date
 
 import cesta
+import mercado
 from cardapio import DIAS, ETAPAS, ICONE_REFEICAO, NOME_DIA, NOME_REFEICAO, REFEICOES, sobra_util
 
 
@@ -42,6 +43,11 @@ def brl(valor: float) -> str:
     return "R$ " + f"{valor:,.2f}".replace(",", "_").replace(".", ",").replace("_", ".")
 
 
+def _ou(itens: list[str]) -> str:
+    """['a', 'b', 'c'] -> 'a, b ou c'."""
+    return itens[0] if len(itens) == 1 else ", ".join(itens[:-1]) + " ou " + itens[-1]
+
+
 def data_br(iso: str) -> str:
     try:
         return date.fromisoformat(iso[:10]).strftime("%d/%m")
@@ -63,8 +69,10 @@ def progresso(atual: int, ajustando: bool = False, concluido: bool = False) -> s
 
 # --- resultado ------------------------------------------------------------------
 def _botoes_resultado() -> list[list[Botao]]:
-    return [[Botao("📅 Ver cardápio", "pl:dia"), Botao("🛒 Lista de compras", "pl:lista")],
-            [Botao("📄 PDF da lista", "pl:pdf"), Botao("🔄 Refazer tudo", "pl:refazer")]]
+    """Botões do C9 (o [🏪 Onde comprar] entra com o C15) + [🛒 Modo mercado] (Pedido I)."""
+    return [[Botao("📅 Ver cardápio", "pl:dia"), Botao("🛒 Lista", "pl:lista")],
+            [Botao("📄 PDF", "pl:pdf"), Botao("🔄 Refazer", "pl:refazer")],
+            [Botao("🛒 Modo mercado", "mm:ver")]]
 
 
 def _botoes_acima_do_orcamento(plano: dict, perfil: dict) -> list[list[Botao]]:
@@ -86,8 +94,8 @@ def resultado(plano: dict, perfil: dict, editar: bool = False, aviso: str = "") 
     nome = perfil.get("nome") or "você"
     topo = [aviso, ""] if aviso else []
     if total <= orc + 0.009:
-        gasto = f"Gasto: *{brl(total)}* de {brl(orc)}. Sobrou *{brl(orc - total)}* 💰"
-        t = "\n".join(topo + [f"*Sua semana está pronta, {nome}!* 🎉", "", gasto, f"🛒 {itens} itens na lista"])
+        gasto = f"Gasto *{brl(total)}* de {brl(orc)}. Sobrou *{brl(orc - total)}* · {itens} itens."
+        t = "\n".join(topo + [f"*Sua semana está pronta, {nome}!* 🎉", "", gasto])
         return tela(t, _botoes_resultado(), editar)
     t = "\n".join(topo + [
         f"*Sua semana está pronta, {nome}!*", "",
@@ -149,20 +157,93 @@ def lista(plano: dict, editar: bool = True) -> Saida:
             secao_atual = l["secao"]
             linhas_txt += ["", f"*{secao_atual}*"]
         promo = promocao_da_linha(plano, l)
-        marca = f" 🏷️ {promo['mercado']} até {data_br(promo['validade'])}" if promo else ""
+        marca = f" 🔥 {promo['mercado']} até {data_br(promo['validade'])}" if promo else ""
         tem_promo |= bool(promo)
-        linhas_txt.append(f"• {l['nome']}, {cesta.texto_embalagem(l)}: {brl(l['custo'])}{marca}")
+        linhas_txt.append(f"• {l['nome']}, {cesta.texto_embalagem(l)}: {brl(mercado.custo_linha(plano, l))}{marca}")
     de_casa = [l for l in plano["cesta"]["linhas"] if l["da_despensa"] > 0]
     if de_casa:
         linhas_txt += ["", "🏠 *Já tem em casa:* " + ", ".join(
             f"{l['nome']} ({l['da_despensa']} {l['unidade']})" for l in de_casa)]
-    total, orc = plano["cesta"]["total"], plano.get("orcamento") or 0
+    total, orc = mercado.resumo(plano)["valor_total"], plano.get("orcamento") or 0  # com os preços pagos
     diferenca = f"Sobra {brl(orc - total)}" if total <= orc else f"Passou {brl(total - orc)}"
     linhas_txt += ["", f"*Total: {brl(total)}* · Orçamento {brl(orc)} · {diferenca}",
-                   "⚠️ Preços estimados" + (", exceto os itens 🏷️ em promoção cadastrada." if tem_promo else ".")]
-    botoes = [[Botao("📄 PDF da lista", "pl:pdf"), Botao("📅 Cardápio", "pl:dia")],
+                   "≈ Preços estimados" + (", exceto os itens 🔥 em promoção cadastrada." if tem_promo else ".")]
+    botoes = [[Botao("🛒 Modo mercado", "mm:ver")],
+              [Botao("📄 PDF", "pl:pdf"), Botao("📅 Cardápio", "pl:dia")],
               [Botao("🏠 Resumo", "pl:res")]]
     return tela("\n".join(linhas_txt), botoes, editar)
+
+
+# --- 🛒 Modo mercado (Pedido I) ----------------------------------------------------
+def _rotulo_item(plano: dict, linha: dict, marcado: bool) -> str:
+    pago = (plano.get("mercado") or {}).get("precos", {}).get(cesta.chave(linha["item"]))
+    preco = brl(mercado.custo_linha(plano, linha)) + (" ✏️" if pago is not None else "")
+    return f"{'✅' if marcado else '⬜'} {linha['nome']} ({cesta.texto_embalagem(linha)}) {preco}"
+
+
+def modo_mercado(plano: dict, editar: bool = True, aviso: str = "") -> Saida:
+    """Lista por seção; cada item é um botão que alterna ⬜/✅ editando a mesma mensagem."""
+    r = mercado.resumo(plano)
+    estado = plano.get("mercado") or {}
+    comprados = set(estado.get("comprados") or [])
+    linhas_txt = ([aviso, ""] if aviso else []) + [
+        "🛒 *Modo mercado*",
+        f"✅ {r['marcados']} de {r['itens']} itens · {brl(r['valor_marcado'])} de {brl(r['valor_total'])}", "",
+        "Toque no item quando ele for para o carrinho."]
+    if estado.get("finalizado"):
+        linhas_txt.append(f"🏁 Compras encerradas em {data_br(estado.get('terminado_em') or '')}.")
+    botoes: list[list[Botao]] = []
+    secao_atual = None
+    for i, l in enumerate(mercado.linhas(plano)):
+        if l["secao"] != secao_atual:
+            secao_atual = l["secao"]
+            botoes.append([Botao(f"· {secao_atual} ·", "mm:x")])
+        marcado = cesta.chave(l["item"]) in comprados
+        botoes.append([Botao(_rotulo_item(plano, l, marcado), f"mm:t:{plano['id']}:{i}")])
+    botoes += [[Botao("✏️ Paguei outro preço", "mm:p"), Botao("🏁 Terminei as compras", "mm:fim")],
+               [Botao("🏠 Resumo", "pl:res")]]
+    return tela("\n".join(linhas_txt), botoes, editar)
+
+
+def escolher_item_preco(plano: dict) -> Saida:
+    botoes = [[Botao(f"{l['nome']} · {brl(mercado.custo_linha(plano, l) / max(1, l['pacotes']))}/{l['embalagem']}",
+                     f"mm:pi:{plano['id']}:{i}")] for i, l in enumerate(mercado.linhas(plano))]
+    botoes.append([Botao("⬅️ Voltar", "mm:ver")])
+    return tela("✏️ Em qual item você pagou outro preço?", botoes, editar=True)
+
+
+def pedir_preco(linha: dict) -> Saida:
+    cada = "cada " if linha["pacotes"] > 1 else ""
+    return tela(f"Quanto custou {cada}*{linha['embalagem']}* de *{linha['nome']}*?\n\n"
+                f"Escreva só o valor (ex.: 23,90).", [[Botao("❌ Cancelar", "mm:ver")]], editar=True)
+
+
+def compras_encerradas(plano: dict, perfil: dict) -> Saida:
+    r = mercado.resumo(plano)
+    estado = plano.get("mercado") or {}
+    linhas_txt = ["🏁 *Compras encerradas!*",
+                  f"✅ {r['marcados']} de {r['itens']} itens · {brl(r['valor_marcado'])}",
+                  "🏠 O que você comprou foi para a despensa."]
+    botoes: list[list[Botao]] = []
+    faltou = estado.get("nao_encontrei") or []
+    if not faltou:
+        linhas_txt += ["", "Achou tudo! 🎉"]
+    else:
+        linhas_txt += ["", "❓ *Não encontrei:*"]
+        afetadas: list[dict] = []
+        for item in faltou:
+            subs = mercado.substitutos(item, perfil)
+            pratos = mercado.pratos_afetados(plano, cesta.chave(item))
+            afetadas += [p for p in pratos if p not in afetadas]
+            onde = ", ".join(f"{NOME_REFEICAO[p['tipo']]} de {NOME_DIA[p['dia']].lower()}" for p in pratos)
+            linhas_txt.append(f"• {item}" + (f" → dá para usar {_ou(subs)}" if subs else "")
+                              + (f". Afeta: {onde}." if onde else "."))
+        if afetadas:
+            linhas_txt += ["", "Quer que eu troque os pratos afetados? Eu evito o que você não encontrou."]
+            botoes += [[Botao(f"🔁 Trocar {NOME_REFEICAO[p['tipo']].lower()} de {NOME_DIA[p['dia']][:3].lower()}",
+                              f"pl:tro:{p['dia']}:{p['tipo']}")] for p in afetadas[:6]]
+    botoes += [[Botao("🛒 Modo mercado", "mm:ver"), Botao("🏠 Resumo", "pl:res")]]
+    return tela("\n".join(linhas_txt), botoes, editar=True)
 
 
 # --- receita e passo a passo -----------------------------------------------------

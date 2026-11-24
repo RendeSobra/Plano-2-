@@ -33,7 +33,8 @@ uma frase.
 refazer tudo. Nunca escreva um cardápio você mesmo: quem monta é a ferramenta, que \
 confere orçamento, alergias e embalagens.
 - trocar_prato: quando a pessoa pedir para trocar um prato específico do plano.
-- mostrar: para mostrar o cardápio, a lista de compras ou o PDF que já existem.
+- mostrar: para mostrar o cardápio, a lista de compras, o PDF ou o Modo mercado (quando a pessoa \
+estiver no mercado e quiser marcar o que já pegou).
 - avaliar_prato: quando a pessoa disser o que achou de um prato (nota de 1 a 5; \
 "amei" = 5, "não gostei" = 2, "odiei" = 1).
 - listar_promocoes: quando perguntarem de promoções.

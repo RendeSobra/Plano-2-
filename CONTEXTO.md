@@ -92,12 +92,14 @@ por texto, áudio e foto, e uma escada de modelos de IA que sobe de nível só q
 | `restricoes.py` | Alergias/restrições conferidas em código (com exceções como "leite de coco", "pão de queijo", "couve-manteiga") |
 | `cadastro.py` | Cadastro com botões e edição pelo `/perfil` |
 | `telas.py` | Telas neutras (texto + botões); o canal só desenha |
-| `pdf.py` | PDF da lista, só na memória |
+| `pdf.py` | PDF da lista, só na memória: fpdf2 desenha a página; pypdf põe as caixinhas clicáveis (AcroForm) |
+| `mercado.py` | 🛒 Modo mercado: marcar o que foi para o carrinho, preço pago, "Terminei as compras" (despensa e "não encontrei") |
 | `banco.py` | Único acesso a dados. SQLite `rende.db` (fora do Git). Para ir ao Supabase, reescrever só ele |
 | `prompts.py` | Personalidade (a mesma para Gemini e Claude), instruções de plano/troca/receita, mensagens fixas |
 
-Tabelas: `usuarios`, `historico` (30 últimas), `planos` (3 últimos; o mais novo é o atual),
-`promocoes`, `uso_diario`, `uso_ia` (custo por chamada, sem texto de conversa nem usuário).
+Tabelas: `usuarios`, `historico` (30 últimas), `planos` (3 últimos; o mais novo é o atual; o
+progresso do Modo mercado fica dentro dele), `promocoes`, `precos` (preços vistos de verdade,
+sem dizer quem informou), `uso_diario`, `uso_ia` (custo por chamada, sem texto de conversa nem usuário).
 
 ## 4. Decisões importantes
 
@@ -122,7 +124,7 @@ Tabelas: `usuarios`, `historico` (30 últimas), `planos` (3 últimos; o mais nov
 ## 5. Como rodar e testar
 
 Veja o [README](README.md). Testes automáticos: `.venv\Scripts\python testes\testar.py`
-(**145 de 145 OK** em 24/11/2026). Ajudantes do teste pelo celular em `testes/celular/`.
+(**172 de 172 OK** em 24/11/2026). Ajudantes do teste pelo celular em `testes/celular/`.
 
 ## 6. Resultado do teste real no celular (23/11/2026)
 

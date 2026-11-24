@@ -79,6 +79,20 @@ CREATE TABLE IF NOT EXISTS promocoes (
     fonte_url       TEXT,
     criado_em       TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS precos (       -- preços vistos de verdade (sem dizer quem informou)
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    produto     TEXT NOT NULL,         -- nome normalizado do item ("arroz", "feijao carioca")
+    nome        TEXT NOT NULL,         -- como apareceu na lista ("Feijão carioca")
+    embalagem   TEXT,                  -- "pacote 5 kg"
+    tamanho     REAL,
+    unidade     TEXT,                  -- 'g', 'ml' ou 'un'
+    preco       REAL NOT NULL,         -- preço de UMA embalagem
+    mercado     TEXT,                  -- quando a pessoa compra num mercado só
+    cidade      TEXT,
+    origem      TEXT NOT NULL,         -- 'usuario' (Modo mercado), 'site', 'encarte' ou 'admin'
+    criado_em   TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS precos_produto ON precos (produto, criado_em);
 CREATE TABLE IF NOT EXISTS uso_diario (
     telegram_id TEXT NOT NULL,
     dia         TEXT NOT NULL,
@@ -105,13 +119,16 @@ CREATE TABLE IF NOT EXISTS uso_ia (       -- sem texto de conversa e sem usuári
 """
 # Colunas acrescentadas depois da primeira versão (o banco antigo ganha as colunas sozinho)
 _COLUNAS_NOVAS = {"uso_ia": {"nivel": "TEXT NOT NULL DEFAULT ''", "cache_leitura": "INTEGER NOT NULL DEFAULT 0",
-                             "cache_escrita": "INTEGER NOT NULL DEFAULT 0", "escalonou_por": "TEXT"}}
+                             "cache_escrita": "INTEGER NOT NULL DEFAULT 0", "escalonou_por": "TEXT"},
+                  # o que o Rende espera da próxima mensagem (ex.: "preco:7:3" = preço do item 3 do plano 7)
+                  "usuarios": {"aguardando": "TEXT"}}
 
 CAMPOS_PERFIL = {
     "nome", "adultos", "criancas", "refeicoes", "dias", "vibe", "restricoes", "restricoes_outras",
     "utensilios", "mercados", "periodo", "orcamento", "cidade", "latitude", "longitude",
     "localizacao_em", "preferencias", "preferencias_pratos", "despensa", "cadastro_passo",
     "avisos_ativos", "aviso_dia_semana", "aviso_horario", "ultimo_aviso_dia", "ultimo_resumo_dia",
+    "aguardando",
 }
 # Guardados como JSON no banco e devolvidos como listas/dicionários
 CAMPOS_JSON = {"refeicoes": list, "dias": list, "restricoes": list, "utensilios": list,
@@ -305,6 +322,31 @@ def apagar_promocoes_vencidas() -> int:
     cur = _db().execute("DELETE FROM promocoes WHERE validade < ?", (hoje(),))
     _db().commit()
     return cur.rowcount
+
+
+# --- preços vistos de verdade (Modo mercado, coletor) -------------------------
+def adicionar_preco(*, produto: str, nome: str, preco: float, origem: str, embalagem: str | None = None,
+                    tamanho: float | None = None, unidade: str | None = None, mercado: str | None = None,
+                    cidade: str | None = None) -> int:
+    cur = _db().execute("""INSERT INTO precos (produto, nome, embalagem, tamanho, unidade, preco, mercado, cidade,
+                                               origem, criado_em) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                        (produto, nome, embalagem, tamanho, unidade, preco, mercado, cidade, origem, _agora_txt()))
+    _db().commit()
+    return cur.lastrowid
+
+
+def precos(produto: str | None = None, origem: str | None = None, limite: int = 50) -> list[dict]:
+    """Preços mais recentes primeiro, filtrando por produto normalizado e/ou origem."""
+    sql, parametros = "SELECT * FROM precos WHERE 1 = 1", []
+    if produto:
+        sql += " AND produto = ?"
+        parametros.append(produto)
+    if origem:
+        sql += " AND origem = ?"
+        parametros.append(origem)
+    sql += " ORDER BY id DESC LIMIT ?"
+    parametros.append(limite)
+    return [dict(l) for l in _db().execute(sql, parametros).fetchall()]
 
 
 # --- uso e custo das IAs -----------------------------------------------------

@@ -176,6 +176,8 @@ def despensa_base(usuario: str, perfil: dict) -> dict:
         return perfil.get("despensa") or {}
     if atual["semana"] != banco.semana_atual():
         return atual.get("cesta", {}).get("despensa_final") or {}
+    if (atual.get("mercado") or {}).get("finalizado"):  # já fez as compras (Modo mercado): o que tem agora
+        return perfil.get("despensa") or {}
     return atual.get("despensa_inicial") or {}
 
 
@@ -507,6 +509,7 @@ async def trocar_prato(usuario: str, dia: str, tipo: str, pedido: str = "") -> d
               for j, r in enumerate(atual["refeicoes"]) if j != i]
     produtos = [f"{p['item']} ({p['embalagem']}, {p['tamanho']:g} {p['unidade']}, R$ {p['preco']:.2f})"
                 for p in atual.get("produtos", [])]
+    nao_achou = (atual.get("mercado") or {}).get("nao_encontrei") or []
     sobra_antiga = (antigo.get("sobra_planejada") or "").strip()
     manter_sobra = ([f"IMPORTANTE: o prato antigo deixava esta sobra planejada, que outras refeições usam: "
                      f"'{sobra_antiga}'. O prato novo precisa deixar a MESMA sobra (mesmo ingrediente extra) "
@@ -521,7 +524,8 @@ async def trocar_prato(usuario: str, dia: str, tipo: str, pedido: str = "") -> d
         f"o prato novo pode acrescentar NO MÁXIMO R$ {folga:.2f} em embalagens novas (conta o preço da "
         f"embalagem inteira, não só o que o prato usa). Se não couber, monte o prato só com o que já está na lista.",
     ] + ([f"Sobras das embalagens já compradas (usar não custa nada): {'; '.join(sobras)}"] if sobras else [])
-      + ([f"Pratos rejeitados (NÃO use): {'; '.join(rejeitados(perfil))}"] if rejeitados(perfil) else []))
+      + ([f"Pratos rejeitados (NÃO use): {'; '.join(rejeitados(perfil))}"] if rejeitados(perfil) else [])
+      + ([f"A pessoa NÃO encontrou no mercado (não use): {'; '.join(nao_achou)}"] if nao_achou else []))
     mensagens = [{"papel": "usuario", "texto": briefing}]
     conferidos: dict[int, tuple] = {}
 
@@ -546,6 +550,10 @@ async def trocar_prato(usuario: str, dia: str, tipo: str, pedido: str = "") -> d
             graves.append("o prato novo é igual ao antigo")
         if sobra_util(sobra_antiga) and not sobra_util(novo.get("sobra_planejada")):
             graves.append(f"o prato novo não deixa a sobra que outras refeições usam: '{sobra_antiga}'")
+        faltou = {cesta.chave(x) for x in nao_achou}
+        usa_o_que_faltou = [i["item"] for i in novo["ingredientes"] if cesta.chave(i["item"]) in faltou]
+        if usa_o_que_faltou:
+            graves.append(f"o prato novo usa o que a pessoa não encontrou no mercado: {', '.join(usa_o_que_faltou)}")
         conferidos[id(resposta)] = (plano_novo, calc_novo, graves)
         return graves
 

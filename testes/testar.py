@@ -4,6 +4,7 @@ nem o Telegram, e usam um banco de dados só na memória.
 Para rodar:   .venv\\Scripts\\python testes\\testar.py
 """
 import asyncio
+import io
 import copy
 import json
 import re
@@ -682,6 +683,139 @@ ok("Receita ajustada para 4,5 porções" in tela_rec.texto and "continua para 2,
    "a tela da receita avisa que a lista de compras não mudou sozinha")
 asyncio.run(cardapio.receita("u1", "seg", "almoco"))
 ok(len(gemini.chamadas) == 2, "mesma família: a receita guardada é reaproveitada (sem nova chamada)")
+
+# =======================================================================================
+secao("C9: resultado e botões")
+import mercado  # noqa: E402
+
+novo_banco()
+gemini, claude = instalar_ias()
+criar_usuario("m1", mercados=["assai"])
+claude.fila = [para_ia(plano_valido())]
+plano_m = asyncio.run(cardapio.gerar_plano("m1"))
+r = telas.resultado(plano_m, banco.usuario("m1"))
+rotulos_r = [b.rotulo for linha in r.botoes for b in linha]
+itens_m = len(mercado.linhas(plano_m))
+ok("Sua semana está pronta, Ana!" in r.texto and f"Gasto *R$ 133,90* de R$ 200,00. Sobrou *R$ 66,10* · {itens_m} itens." in r.texto,
+   "resultado no formato do C9: gasto, orçamento, sobra e número de itens")
+ok(rotulos_r[:4] == ["📅 Ver cardápio", "🛒 Lista", "📄 PDF", "🔄 Refazer"] and "🛒 Modo mercado" in rotulos_r,
+   "botões do C9 com os textos do pedido + [🛒 Modo mercado]")
+ok(any(b.acao == "mm:ver" for linha in telas.lista(plano_m).botoes for b in linha), "a lista também tem [🛒 Modo mercado]")
+
+secao("🛒 Modo mercado")
+pid = plano_m["id"]
+s = asyncio.run(atendimento.acao("m1", "mm:ver"))[0]
+acoes_m = [b.acao for linha in s.botoes for b in linha]
+ok(f"✅ 0 de {itens_m} itens · R$ 0,00 de R$ 133,90" in s.texto and f"mm:t:{pid}:0" in acoes_m and "mm:x" in acoes_m
+   and acoes_m[0] == "mm:x", "abre com o topo '✅ 0 de N itens · R$ 0 de R$ total', seções e um botão por item")
+primeira = mercado.linhas(plano_m)[0]
+s = asyncio.run(atendimento.acao("m1", f"mm:t:{pid}:0"))[0]
+rotulo_1 = next(b.rotulo for linha in s.botoes for b in linha if b.acao == f"mm:t:{pid}:0")
+ok(s.editar and f"✅ 1 de {itens_m} itens · {telas.brl(primeira['custo'])} de R$ 133,90" in s.texto and rotulo_1.startswith("✅"),
+   "tocar no item marca ✅ editando a mesma mensagem, e o total parcial sobe")
+s = asyncio.run(atendimento.acao("m1", f"mm:t:{pid}:0"))[0]
+ok(f"✅ 0 de {itens_m} itens" in s.texto and banco.plano_atual("m1")["mercado"]["comprados"] == [],
+   "tocar de novo desmarca (⬜)")
+asyncio.run(atendimento.acao("m1", f"mm:t:{pid}:1"))
+asyncio.run(atendimento.acao("m1", f"mm:t:{pid}:2"))
+duas = mercado.linhas(plano_m)[1:3]
+s = asyncio.run(atendimento.acao("m1", "mm:ver"))[0]
+ok(f"✅ 2 de {itens_m} itens · {telas.brl(duas[0]['custo'] + duas[1]['custo'])}" in s.texto
+   and sorted(banco.plano_atual("m1")["mercado"]["comprados"]) == sorted(cesta.chave(l["item"]) for l in duas),
+   "o progresso fica salvo no banco: fechar e abrir de novo continua de onde parou")
+ok(asyncio.run(atendimento.acao("m1", "mm:x")) == [], "título de seção não faz nada")
+s = asyncio.run(atendimento.acao("m1", f"mm:t:{pid + 99}:0"))[0]
+ok("O plano mudou" in s.texto, "botão de um plano que já mudou não marca o item errado")
+ok(mercado.ler_preco("23,90") == 23.9 and mercado.ler_preco("R$ 1.234,50") == 1234.5 and mercado.ler_preco("23.9") == 23.9
+   and mercado.ler_preco("abc") is None and mercado.ler_preco("0") is None, "lê o preço escrito de vários jeitos")
+s = asyncio.run(atendimento.acao("m1", "mm:p"))[0]
+ok(any(b.acao == f"mm:pi:{pid}:3" for linha in s.botoes for b in linha), "[✏️ Paguei outro preço] mostra os itens para escolher")
+quarta = mercado.linhas(plano_m)[3]
+s = asyncio.run(atendimento.acao("m1", f"mm:pi:{pid}:3"))[0]
+ok(quarta["embalagem"] in s.texto and "Escreva só o valor" in s.texto and banco.usuario("m1")["aguardando"] == f"preco:{pid}:3",
+   "escolher o item pede o preço da embalagem e o Rende fica esperando o valor")
+s = asyncio.run(atendimento.responder("m1", "R$ 15,50"))[0]
+pago = banco.precos(produto=cesta.chave(quarta["item"]))
+ok("Anotei" in s.texto and not s.editar and banco.usuario("m1")["aguardando"] is None
+   and pago and pago[0]["origem"] == "usuario" and pago[0]["preco"] == 15.5 and pago[0]["mercado"] == "Assaí",
+   "o preço informado alimenta a tabela de preços (origem 'usuario', mercado da pessoa)")
+r_m = mercado.resumo(banco.plano_atual("m1"))
+ok(r_m["marcados"] == 3 and r_m["valor_marcado"] == round(duas[0]["custo"] + duas[1]["custo"] + 15.5 * quarta["pacotes"], 2)
+   and r_m["valor_total"] == round(133.90 - quarta["custo"] + 15.5 * quarta["pacotes"], 2),
+   "o item com preço informado fica marcado e os totais usam o preço real")
+gemini.chamadas.clear()
+asyncio.run(atendimento.acao("m1", f"mm:pi:{pid}:4"))
+s = asyncio.run(atendimento.responder("m1", "e aí, tudo bem?"))
+ok(banco.usuario("m1")["aguardando"] is None and gemini.chamadas, "se a mensagem não for um preço, a espera acaba e vira conversa normal")
+banco.atualizar_perfil("m1", restricoes=["vegetariano", "lactose"])
+ok(mercado.substitutos("Frango coxa", banco.usuario("m1")) == ["ovo"]
+   and mercado.substitutos("leite integral", banco.usuario("m1")) == ["leite sem lactose"],
+   "substitutos respeitam as restrições (vegetariano: só ovo no lugar do frango; lactose: leite sem lactose)")
+banco.atualizar_perfil("m1", restricoes=["lactose"])
+s = asyncio.run(atendimento.acao("m1", "mm:fim"))[0]
+plano_f = banco.plano_atual("m1")
+casa = banco.usuario("m1")["despensa"]
+comprados_f = set(plano_f["mercado"]["comprados"])
+ok(plano_f["mercado"]["finalizado"] and len(plano_f["mercado"]["nao_encontrei"]) == itens_m - 3
+   and all(cesta.chave(i) not in comprados_f for i in plano_f["mercado"]["nao_encontrei"]),
+   "[🏁 Terminei] guarda o que ficou sem marcar na lista 'não encontrei'")
+tamanhos_m = {cesta.chave(p["item"]): p["tamanho"] for p in plano_f["produtos"]}
+ok(all(casa[k]["quantidade"] == round(l["pacotes"] * tamanhos_m[k]) for l in mercado.linhas(plano_f)
+       for k in [cesta.chave(l["item"])] if k in comprados_f)
+   and not any(cesta.chave(i) in casa for i in plano_f["mercado"]["nao_encontrei"]),
+   "o que foi comprado vai para a despensa (o que ficou de fora, não)")
+com_substituto = next(i for i in plano_f["mercado"]["nao_encontrei"] if mercado.substitutos(i, banco.usuario("m1")))
+ok("Compras encerradas" in s.texto and "Não encontrei" in s.texto
+   and f"• {com_substituto} → dá para usar {mercado.substitutos(com_substituto, banco.usuario('m1'))[0]}" in s.texto
+   and any(b.acao.startswith("pl:tro:") for linha in s.botoes for b in linha),
+   f"o Rende oferece substitutos ({com_substituto}) e a troca dos pratos afetados")
+ok(not any(cesta.chave(i) in plano_f["cesta"]["despensa_final"] for i in plano_f["mercado"]["nao_encontrei"]
+           if cesta.chave(i) not in (plano_f.get("despensa_inicial") or {})),
+   "a despensa da semana seguinte não conta sobra do que não foi comprado")
+ok(cardapio.despensa_base("m1", banco.usuario("m1")) == casa, "refazer o plano depois das compras parte do que tem em casa agora")
+faltou_f = plano_f["mercado"]["nao_encontrei"][0]
+afetada = mercado.pratos_afetados(plano_f, cesta.chave(faltou_f))[0]
+claude.fila = [troca_ia(refeicao(afetada["dia"], afetada["tipo"], "Prato com o que faltou", [(faltou_f, 100, "g")]))] * 3
+claude.chamadas.clear()
+asyncio.run(atendimento.trocar_prato("m1", afetada["dia"], afetada["tipo"]))
+ok(f"NÃO encontrou no mercado (não use): " in claude.chamadas[0]["mensagens"][0]["texto"]
+   and "não encontrou no mercado" in claude.chamadas[1]["mensagens"][-1]["texto"],
+   "a troca sabe o que faltou e reprova prato que usa o item não encontrado")
+
+secao("C11: PDF com caixinhas clicáveis")
+from pypdf import PdfReader  # noqa: E402
+
+plano_pdf = banco.plano_atual("m1")
+arquivo = pdf.gerar(plano_pdf, banco.usuario("m1"))
+leitor = PdfReader(io.BytesIO(arquivo))
+campos = leitor.get_fields() or {}
+widgets = [a.get_object() for p in leitor.pages for a in (p.get("/Annots") or [])]
+ok(len(campos) == itens_m and all(c.get("/FT") == "/Btn" for c in campos.values()),
+   f"uma caixinha de formulário (AcroForm) por item ({len(campos)} de {itens_m})")
+ok(all(int(w["/F"]) & 4 and set(w["/AP"]["/N"].keys()) == {"/Yes", "/Off"} for w in widgets),
+   "caixinhas com aparência marcada/desmarcada e visíveis na impressão")
+texto_pdf = " ".join(p.extract_text() for p in leitor.pages)
+ok("estimado" in texto_pdf and "preço pago" in texto_pdf and "Dica: no Telegram, use o Modo mercado" in texto_pdf
+   and telas.brl(r_m["valor_total"]).replace("R$ ", "") in texto_pdf,
+   "cada item diz 'estimado' ou 'preço pago', o total usa o preço pago e a dica do Modo mercado vai no fim")
+banco.adicionar_promocao(mercado="Assaí", produto="arroz", preco=22.9, validade="2099-12-31", cidade="Goiânia", origem="admin")
+plano_promo = copy.deepcopy(plano_pdf)
+plano_promo["promocoes"] = {"1": banco.promocao(1)}
+for l in plano_promo["cesta"]["linhas"]:
+    if l["item"] == "arroz":
+        l["promocao_id"] = 1
+texto_promo = PdfReader(io.BytesIO(pdf.gerar(plano_promo, banco.usuario("m1")))).pages[0].extract_text()
+ok("PROMOÇÃO" in texto_promo and "(Assaí, até 31/12)" in texto_promo, "item em promoção: 'PROMOÇÃO (mercado, até dd/mm)'")
+grande = copy.deepcopy(plano_pdf)
+grande.pop("mercado", None)
+base = grande["cesta"]["linhas"][0]
+grande["cesta"]["linhas"] = [{**base, "item": f"item {n}", "nome": f"item {n}", "secao": cardapio.SECOES[n % 6]}
+                             for n in range(70)]
+grande["cesta"]["linhas"].sort(key=lambda l: l["secao"])
+leitor_g = PdfReader(io.BytesIO(pdf.gerar(grande, banco.usuario("m1"))))
+rects = [[float(v) for v in a.get_object()["/Rect"]] for p in leitor_g.pages for a in (p.get("/Annots") or [])]
+ok(len(leitor_g.pages) >= 2 and len(rects) == 70 and all(r[1] > 30 and r[3] < 842 for r in rects),
+   f"lista grande: {len(leitor_g.pages)} páginas, cada caixinha dentro da página do seu item")
 
 # =======================================================================================
 secao("Cadastro com botões")

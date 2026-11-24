@@ -15,6 +15,7 @@ import banco
 import cadastro
 import cardapio
 import ferramentas
+import mercado
 import pdf
 import prompts
 import roteador
@@ -112,7 +113,57 @@ async def acao(usuario: str, acao_txt: str) -> list[Saida]:
         return [Saida(texto=prompts.ESQUECER_CANCELADO, editar=True)]
     if acao_txt.startswith("pl:"):
         return await _acao_plano(usuario, acao_txt)
+    if acao_txt.startswith("mm:"):
+        return _acao_mercado(usuario, acao_txt)
     return [telas.texto("Não entendi esse botão 🤔")]
+
+
+def _acao_mercado(usuario: str, acao_txt: str) -> list[Saida]:
+    """🛒 Modo mercado: mm:ver, mm:t:<plano>:<i> (marca/desmarca), mm:p (paguei outro preço),
+    mm:pi:<plano>:<i> (pede o preço daquele item), mm:fim (terminei), mm:x (título de seção)."""
+    if acao_txt == "mm:x":
+        return []  # título de seção: não faz nada
+    plano = banco.plano_atual(usuario)
+    if plano is None:
+        return [telas.tela(prompts.SEM_PLANO, [[Botao("✨ Montar agora", "pl:montar")]])]
+    banco.atualizar_perfil(usuario, aguardando=None)  # qualquer botão cancela a espera de um preço
+    partes = acao_txt.split(":")
+    if partes[1] in ("t", "pi"):
+        if len(partes) < 4 or partes[2] != str(plano["id"]):  # botão de um plano que já mudou
+            return [telas.modo_mercado(plano, aviso="O plano mudou: atualizei a lista.")]
+        i = int(partes[3])
+        if partes[1] == "t":
+            return [telas.modo_mercado(mercado.alternar(usuario, i))]
+        linha = mercado.linha_por_indice(plano, i)
+        if linha is None:
+            return [telas.modo_mercado(plano)]
+        banco.atualizar_perfil(usuario, aguardando=f"preco:{plano['id']}:{i}")
+        return [telas.pedir_preco(linha)]
+    if partes[1] == "p":
+        return [telas.escolher_item_preco(plano)]
+    if partes[1] == "fim":
+        plano = mercado.terminar(usuario)
+        log.info("Modo mercado: compras encerradas (%d itens sem encontrar).",
+                 len(plano["mercado"]["nao_encontrei"]))
+        return [telas.compras_encerradas(plano, banco.usuario(usuario))]
+    return [telas.modo_mercado(plano)]
+
+
+def _resposta_de_preco(usuario: str, perfil: dict, texto: str) -> list[Saida] | None:
+    """A pessoa tocou em [✏️ Paguei outro preço] e agora escreveu o valor. None = não era um preço
+    (a espera é cancelada e a mensagem segue para a conversa normal)."""
+    aguardando = perfil.get("aguardando") or ""
+    banco.atualizar_perfil(usuario, aguardando=None)
+    _, plano_id, indice = aguardando.split(":")
+    preco = mercado.ler_preco(texto)
+    plano = banco.plano_atual(usuario)
+    if preco is None or plano is None or str(plano["id"]) != plano_id:
+        return None
+    plano, linha = mercado.informar_preco(usuario, int(indice), preco)
+    if linha is None:
+        return None
+    aviso = f"✏️ Anotei: {linha['nome']} por {telas.brl(preco)} ({linha['embalagem']})."
+    return [telas.modo_mercado(plano, editar=False, aviso=aviso)]
 
 
 async def _acao_plano(usuario: str, acao_txt: str) -> list[Saida]:
@@ -314,6 +365,11 @@ async def responder(usuario: str, texto: str, anexo: dict | None = None) -> list
             if rapida is not None:
                 banco.contar_mensagem(usuario)
                 return rapida
+        if (perfil.get("aguardando") or "").startswith("preco:") and not anexo:
+            preco = _resposta_de_preco(usuario, perfil, texto)
+            if preco is not None:
+                banco.contar_mensagem(usuario)
+                return preco
 
         texto_hist = f"{ROTULOS[anexo['tipo']]} {texto}".strip() if anexo else texto
         mensagem = {"papel": "usuario", "texto": texto_hist, **({"anexo": anexo} if anexo else {})}
