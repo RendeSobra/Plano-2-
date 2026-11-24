@@ -4,6 +4,7 @@ O canal (hoje bot_telegram.py) só desenha: Saida.texto vira a mensagem e
 Saida.botoes vira o teclado de botões. `acao` é o que volta quando o botão é tocado
 (curto: o Telegram aceita até 64 bytes).
 """
+import math
 from dataclasses import dataclass, field
 from datetime import date
 
@@ -66,16 +67,34 @@ def _botoes_resultado() -> list[list[Botao]]:
             [Botao("📄 PDF da lista", "pl:pdf"), Botao("🔄 Refazer tudo", "pl:refazer")]]
 
 
-def resultado(plano: dict, perfil: dict, editar: bool = False) -> Saida:
+def _botoes_acima_do_orcamento(plano: dict, perfil: dict) -> list[list[Botao]]:
+    """Lacuna 3 (Pedido I): o plano passou do orçamento; a pessoa escolhe como resolver."""
+    semanal = math.ceil(plano["cesta"]["total"] / 10 - 1e-9) * 10
+    if perfil.get("periodo") == "mes":
+        rotulo = f"💰 Aumentar para {brl(math.ceil(semanal * 4.3 / 10) * 10)}/mês"
+    else:
+        rotulo = f"💰 Aumentar para {brl(semanal)}"
+    linha = [Botao(rotulo, "pl:ajo:orc")]
+    if any(r["tipo"] == "lanche" for r in plano["refeicoes"]):
+        linha.insert(0, Botao("✂️ Tirar lanches", "pl:ajo:lanches"))
+    return [linha, [Botao("🥘 Pratos mais simples", "pl:ajo:simples")]]
+
+
+def resultado(plano: dict, perfil: dict, editar: bool = False, aviso: str = "") -> Saida:
     total, orc = plano["cesta"]["total"], plano.get("orcamento") or 0
     itens = sum(1 for l in plano["cesta"]["linhas"] if l["pacotes"] > 0)
     nome = perfil.get("nome") or "você"
-    if total <= orc:
+    topo = [aviso, ""] if aviso else []
+    if total <= orc + 0.009:
         gasto = f"Gasto: *{brl(total)}* de {brl(orc)}. Sobrou *{brl(orc - total)}* 💰"
-    else:
-        gasto = f"Gasto: *{brl(total)}* de {brl(orc)}. Passou {brl(total - orc)} do orçamento 😕"
-    t = f"*Sua semana está pronta, {nome}!* 🎉\n\n{gasto}\n🛒 {itens} itens na lista"
-    return tela(t, _botoes_resultado(), editar)
+        t = "\n".join(topo + [f"*Sua semana está pronta, {nome}!* 🎉", "", gasto, f"🛒 {itens} itens na lista"])
+        return tela(t, _botoes_resultado(), editar)
+    t = "\n".join(topo + [
+        f"*Sua semana está pronta, {nome}!*", "",
+        f"⚠️ Não consegui fechar em {brl(orc)}: o melhor plano que achei ficou em *{brl(total)}*, "
+        f"{brl(total - orc)} acima do orçamento.", f"🛒 {itens} itens na lista", "",
+        "Como prefere resolver?"])
+    return tela(t, _botoes_acima_do_orcamento(plano, perfil) + _botoes_resultado(), editar)
 
 
 # --- cardápio por dia ------------------------------------------------------------
@@ -157,6 +176,9 @@ def receita(plano: dict, perfil: dict, d: str, t: str, rec: dict, editar: bool =
     linhas += [f"• {ing}" for ing in rec["ingredientes"]]
     if rec.get("dica"):
         linhas += ["", f"💡 {rec['dica']}"]
+    if rec.get("porcoes_plano") and rec.get("porcoes") and rec["porcoes_plano"] != rec["porcoes"]:
+        linhas += ["", f"ℹ️ Receita ajustada para {cesta.porcoes_txt(rec['porcoes'])}. A lista de compras "
+                       f"continua para {cesta.porcoes_txt(rec['porcoes_plano'])}: use 🔄 Refazer se quiser outra."]
     botoes = [[Botao("👩‍🍳 Cozinhar passo a passo", f"pl:pas:{d}:{t}:0")],
               [Botao("🔁 Trocar", f"pl:tro:{d}:{t}"), Botao(f"⬅️ {NOME_DIA[d]}", f"pl:dia:{d}")]]
     return tela("\n".join(linhas), botoes, editar)

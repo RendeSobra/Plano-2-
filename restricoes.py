@@ -46,11 +46,38 @@ PROIBIDOS: dict[str, list[str]] = {
                     *_PEIXES, *_FRUTOS_DO_MAR],
 }
 
+# Pratos que COSTUMAM levar o ingrediente proibido, mesmo quando o nome não diz (C10, 24/11):
+# "Purê de batata" leva leite e manteiga; "Feijoada" leva carne de porco. A IA às vezes lista
+# só os ingredientes "principais" e o problema aparece depois, na receita. Quem quiser a versão
+# segura escreve no nome ("Purê de batata sem lactose", "Feijão tropeiro vegetariano").
+ESCONDIDOS: dict[str, list[str]] = {
+    "lactose": ["empadao", "empada", "strogonoff", "estrogonofe", "estrogonoff", "stroganoff", "pure",
+                "lasanha", "escondidinho", "gratinado", "gratinada", "parmegiana", "parmigiana", "molho branco",
+                "bechamel", "fondue", "mingau", "vitamina", "pudim", "brigadeiro", "panqueca", "pamonha",
+                "quiche", "cappuccino", "capuccino", "pao de queijo", "bolo"],
+    "gluten": ["panqueca", "torta", "quiche", "crepe", "milanesa", "parmegiana", "parmigiana", "molho branco",
+               "bechamel", "yakisoba", "sonho", "rosca", "cuca", "waffle", "tabule"],
+    "ovo": ["quindim", "pudim", "panqueca", "bolo", "suspiro", "merengue", "fios de ovos", "empanado",
+            "empanada", "milanesa", "parmegiana", "parmigiana", "pao de queijo", "torta", "empadao", "empada",
+            "gemada", "quiche", "maionese"],
+    "amendoim": ["vatapa", "cajuzinho"],
+    "frutos_do_mar": ["vatapa", "caruru", "acaraje", "bobo", "paella"],
+    "peixe": ["caldeirada", "moqueca"],
+    "soja": ["yakisoba", "teriyaki", "missoshiru"],
+    "vegetariano": ["feijoada", "galinhada", "carreteiro", "tropeiro", "mocoto", "dobradinha", "buchada",
+                    "sarapatel", "hamburguer", "almondega", "almondegas", "kibe", "quibe", "coxinha", "empadao",
+                    "canja", "baiao de dois", "vaca atolada", "picadinho", "bife", "churrasco", "estrogonofe",
+                    "strogonoff", "estrogonoff", "escondidinho", "moqueca", "caldeirada", "vatapa", "acaraje"],
+}
+
 # Marcadores que liberam o ingrediente INTEIRO para aquela restrição ("creme de leite sem lactose")
 MARCADORES: dict[str, list[str]] = {
     "lactose": ["sem lactose", "zero lactose"],
     "gluten": ["sem gluten"],
     "ovo": ["sem ovo"],
+    # só marcadores explícitos: o marcador libera o texto inteiro, e "de legumes" liberaria
+    # "Sopa de legumes com frango"
+    "vegetariano": ["vegetariano", "vegetariana", "vegano", "vegana"],
 }
 
 # Expressões seguras que são apagadas antes da busca ("leite de coco" não é leite de vaca)
@@ -77,7 +104,7 @@ def _contem(texto_norm: str, termo: str) -> bool:
 
 def termos_proibidos(restricoes: list[str], outras: str | None = None) -> dict[str, list[str]]:
     """Restrição -> termos proibidos. 'outras' (texto livre) vira termos extras: 'coentro, pimenta'."""
-    termos = {r: PROIBIDOS[r] for r in restricoes if r in PROIBIDOS}
+    termos = {r: PROIBIDOS[r] + ESCONDIDOS.get(r, []) for r in restricoes if r in PROIBIDOS}
     extras = [normalizar(t) for t in re.split(r",|;|\be\b|\n", outras or "") if normalizar(t)]
     if extras:
         termos["outro"] = extras

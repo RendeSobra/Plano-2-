@@ -136,6 +136,8 @@ async def _acao_plano(usuario: str, acao_txt: str) -> list[Saida]:
                  if minutos > 0 else "")
         return [Saida(tipo="documento", texto="📄 Sua lista de compras." + aviso, dados=pdf.gerar(plano, perfil),
                       nome_arquivo=pdf.nome_arquivo(perfil), apagar_apos=minutos * 60)]
+    if partes[1] == "ajo":  # plano acima do orçamento: a pessoa escolheu como resolver
+        return _ajustar_orcamento(usuario, plano, partes[2] if len(partes) > 2 else "")
 
     d, t = partes[2], partes[3]
     try:
@@ -158,6 +160,25 @@ async def _acao_plano(usuario: str, acao_txt: str) -> list[Saida]:
         cardapio.avaliar(usuario, prato, nota)
         return [telas.nota_salva(prato, nota)]
     return [telas.texto("Não entendi esse botão 🤔")]
+
+
+def _ajustar_orcamento(usuario: str, plano: dict, como: str) -> list[Saida]:
+    """Lacuna 3: tirar lanches e aumentar o orçamento são só conta; pratos mais simples monta de novo."""
+    if como == "simples":
+        return [Saida(tipo="acao", acao="pl:montar", texto=cardapio.pedido_mais_simples(plano))]
+    if como == "lanches" and cardapio.tem_lanches(plano):
+        plano = cardapio.tirar_lanches(usuario)
+        aviso = "✂️ Tirei os lanches desta semana e dos próximos planos (dá para voltar no /perfil)."
+    elif como == "orc":
+        plano = cardapio.aumentar_orcamento(usuario)
+        perfil = banco.usuario(usuario)
+        periodo = "mês" if perfil.get("periodo") == "mes" else "semana"
+        aviso = f"💰 Orçamento atualizado para {telas.brl(perfil['orcamento'])} por {periodo} (também no seu perfil)."
+    else:
+        return [telas.resultado(plano, banco.usuario(usuario), editar=True)]
+    banco.adicionar_mensagem(usuario, "assistente", f"({aviso} Total agora {telas.brl(plano['cesta']['total'])} "
+                                                    f"de {telas.brl(plano['orcamento'])}.)")
+    return [telas.resultado(plano, banco.usuario(usuario), editar=True, aviso=aviso)]
 
 
 # --- ações demoradas (com progresso) --------------------------------------------------

@@ -11,7 +11,7 @@ O **Pedido I** (mesmo arquivo) manda executar os itens pendentes do H numa ordem
 com decisões do dono que valem por cima do H (ver "Decisões do Pedido I").
 Histórico, testes reais e detalhes: [CONTEXTO.md](CONTEXTO.md).
 
-Testes automáticos: `.venv\Scripts\python testes\testar.py` (**124 de 124 OK em 24/11/2026**).
+Testes automáticos: `.venv\Scripts\python testes\testar.py` (**145 de 145 OK em 24/11/2026**).
 
 ## Pedidos e situação
 
@@ -26,7 +26,7 @@ Testes automáticos: `.venv\Scripts\python testes\testar.py` (**124 de 124 OK em
 | F | Escada de modelos: Gemini → Haiku → Sonnet → Opus, limites por modelo, cache, /custos | ✅ Feito e testado no celular (23/11) |
 | G | Mensagens de troca e PDF sem poluir o chat; contexto no GitHub | ✅ Feito |
 | H | Retomada com a especificação completa (PARTES A a F) | 🔧 PARTE A ✅ (24/11). Itens pendentes: ver Pedido I |
-| I | Executar os pendentes do H sem parar entre etapas + Modo mercado + PDF com caixinhas | 🔧 Custo do cardápio ✅ (24/11). Próximo: C10 |
+| I | Executar os pendentes do H sem parar entre etapas + Modo mercado + PDF com caixinhas | 🔧 Custo do cardápio ✅ · C10 ✅ (24/11). Próximo: C9, C11 e Modo mercado |
 
 ## Pedido H: situação de cada item da PARTE C (conferido em 24/11/2026)
 
@@ -41,7 +41,7 @@ Testes automáticos: `.venv\Scripts\python testes\testar.py` (**124 de 124 OK em
 | C7 Cadastro | ✅ | — |
 | C8 "Montando seu plano" | ✅ | — |
 | C9 Resultado | 🟡 | Falta o botão "🏪 Onde comprar" (depende do C15); textos dos botões diferentes do pedido |
-| C10 Conferências em código | 🟡 | Alergia escondida só no nome do prato passa ("empadão", "strogonoff", "purê", "lasanha" para lactose). Repetir a semana anterior só gera aviso no log. Plano acima do orçamento pode ser entregue como "melhor resultado". Receita guardada não se atualiza se a família mudar de tamanho |
+| C10 Conferências em código | ✅ (24/11) | Feito no Pedido I: pratos que costumam levar o ingrediente proibido são barrados pelo nome (purê, strogonoff, empadão, lasanha, escondidinho, pamonha, feijoada, galinhada, vatapá...), salvo a versão segura escrita no nome ("sem lactose", "vegetariano"); 2 ou mais pratos repetidos da semana passada (fora favoritos) fazem refazer, 1 é só aviso; plano acima do orçamento é entregue com o aviso e os botões [Tirar lanches] [Aumentar para R$ X] [Pratos mais simples], e o cadastro avisa quando o orçamento fica abaixo de 75% da sugestão; a receita guarda as porções e é refeita na nova proporção se a família mudar (a lista não muda sozinha). Alergia no registro é reconhecida pelo rótulo "(Lactose)", não pela palavra solta |
 | C11 PDF | 🟡 | Falta "≈ estimado" em cada item (hoje é nota no rodapé), a marca "🔥 promoção (mercado, até dd/mm)" e a separação por mercado. A fonte padrão (Helvetica) não desenha emoji |
 | C12 Mercados próximos | ❌ | Não começado |
 | C13 Coletor | ❌ | Não começado. Fase 1 (pesquisa) **para e espera aprovação** |
@@ -54,8 +54,8 @@ Sem parar entre os itens; resumo curto ao fim de cada C.
 
 1. ✅ PARTE A do H: ler tudo, segurança, resumo (24/11).
 2. ✅ **Custo do cardápio** (24/11): JSON compacto sem modo de preparo; medição antes/depois.
-3. ⏳ **Próximo: C10** (conferências), incluindo a lacuna 3 (plano acima do orçamento).
-4. C9, C11 e **Modo mercado** (marcar o que já foi comprado; PDF com caixinhas clicáveis).
+3. ✅ C10 (conferências), incluindo a lacuna 3 (plano acima do orçamento) (24/11).
+4. ⏳ **Próximo:** C9, C11 e **Modo mercado** (marcar o que já foi comprado; PDF com caixinhas clicáveis).
 5. C6 (entender qualquer mensagem).
 6. C2 (escada de modelos).
 7. C3 (escopo).

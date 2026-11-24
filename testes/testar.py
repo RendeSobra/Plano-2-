@@ -579,6 +579,111 @@ ok(roteador.categoria([estouro]) == "orçamento" and roteador.categoria([estouro
    "nome de item na dica ('ovo') não faz o estouro de orçamento virar 'alergia' no registro")
 
 # =======================================================================================
+secao("C10: alergia escondida no nome do prato")
+ok(all(v(p, ["lactose"]) for p in ("Empadão goiano", "Strogonoff de frango", "Purê de batata",
+                                   "Lasanha à bolonhesa", "Escondidinho de carne seca", "Pamonha de sal")),
+   "lactose: empadão, strogonoff, purê, lasanha, escondidinho e pamonha são barrados pelo nome")
+ok(not v("Purê de batata sem lactose", ["lactose"]) and not v("Strogonoff de frango zero lactose", ["lactose"]),
+   "a versão 'sem lactose' escrita no nome é liberada")
+ok(v("Feijoada simples", ["vegetariano"]) and v("Galinhada goiana", ["vegetariano"])
+   and not v("Feijão tropeiro vegetariano", ["vegetariano"]), "vegetariano: feijoada e galinhada barradas; tropeiro vegetariano liberado")
+ok(v("Sopa de legumes com frango", ["vegetariano"]), "'de legumes' não libera um prato com frango")
+ok(v("Vatapá", ["amendoim"]) and v("Vatapá", ["frutos_do_mar"]) and v("Panqueca de carne", ["gluten"])
+   and v("Quindim", ["ovo"]), "vatapá (castanha e camarão), panqueca (trigo) e quindim (ovo)")
+ok(not v("Arroz com pequi", ["lactose", "gluten", "vegetariano"]) and not v("Couve manteiga refogada", ["lactose"]),
+   "sem falso alarme em prato goiano sem o ingrediente")
+
+secao("C10: repetir a semana anterior")
+novo_banco()
+perfil = criar_usuario()
+calc = cesta.calcular(plano_valido(), {})
+g, av = cardapio.conferir(plano_valido(), perfil, calc, 200, ["Arroz, feijão e carne moída"])
+ok(not g and av, "1 prato repetido da semana passada: só aviso (coincidência comum)")
+g, _ = cardapio.conferir(plano_valido(), perfil, calc, 200, ["Arroz, feijão e carne moída", "Feijão tropeiro com ovo"])
+ok(any("semana passada" in x for x in g) and roteador.categoria(g) == "repetição",
+   "2 ou mais pratos repetidos da semana passada: o plano é refeito")
+banco.atualizar_perfil("u1", preferencias_pratos={"feijao tropeiro com ovo": {"prato": "Feijão tropeiro com ovo", "nota": 5}})
+g, _ = cardapio.conferir(plano_valido(), banco.usuario("u1"), calc, 200,
+                         ["Arroz, feijão e carne moída", "Feijão tropeiro com ovo"])
+ok(not g, "favorito pode repetir (não conta para o limite)")
+
+secao("C10 / lacuna 3: plano acima do orçamento é entregue com opções")
+import atendimento  # noqa: E402
+
+novo_banco()
+gemini, claude = instalar_ias()
+criar_usuario("o1", orcamento=100.0)
+claude.fila = [para_ia(plano_valido()), para_ia(plano_valido())]
+plano_o = asyncio.run(cardapio.gerar_plano("o1"))
+ok(modelos(claude) == [SONNET, OPUS] and plano_o["cesta"]["total"] == 133.90 and cardapio.excesso(plano_o) == 33.90,
+   "nenhum modelo fechou no orçamento: o melhor plano é entregue (passou R$ 33,90)")
+r = telas.resultado(plano_o, banco.usuario("o1"))
+acoes_r = [b.acao for linha in r.botoes for b in linha]
+rotulos_r = [b.rotulo for linha in r.botoes for b in linha]
+ok("R$ 33,90 acima do orçamento" in r.texto and "pl:ajo:orc" in acoes_r and "pl:ajo:simples" in acoes_r
+   and "💰 Aumentar para R$ 140,00" in rotulos_r and "pl:ajo:lanches" not in acoes_r,
+   "o resultado avisa quanto passou e oferece [Aumentar para R$ 140] e [Pratos mais simples] (sem lanches: sem o botão)")
+s = asyncio.run(atendimento.acao("o1", "pl:ajo:simples"))
+ok(s[0].tipo == "acao" and s[0].acao == "pl:montar" and "mais simples" in s[0].texto and "33.90" in s[0].texto,
+   "[Pratos mais simples] monta de novo, pedindo pratos mais baratos e dizendo quanto passou")
+s = asyncio.run(atendimento.acao("o1", "pl:ajo:orc"))
+ok(banco.usuario("o1")["orcamento"] == 140.0 and banco.plano_atual("o1")["orcamento"] == 140.0
+   and "Sobrou" in s[0].texto and "Orçamento atualizado para R$ 140,00" in s[0].texto and s[0].editar,
+   "[Aumentar] sobe o orçamento do perfil e do plano, sem chamar a IA")
+criar_usuario("o2", orcamento=500.0, periodo="mes", refeicoes=["almoco", "jantar", "lanche"])
+com_lanche = para_ia(plano_valido())
+com_lanche["refeicoes"].append({"dias": ["seg", "ter", "qua"], "tipo": "lanche", "prato": "Banana", "min": 1,
+                                "equip": [], "ingr": [{"item": "banana", "qtd": 3}], "sobra": ""})
+com_lanche["compras"].append({"item": "banana", "emb": "penca 12 un", "tam": 12, "un": "un", "preco": 6.0,
+                              "secao": "Hortifrúti", "promo": 0})
+claude.fila = [com_lanche, com_lanche]
+claude.chamadas.clear()
+plano_l = asyncio.run(cardapio.gerar_plano("o2"))
+r = telas.resultado(plano_l, banco.usuario("o2"))
+rotulos_r = [b.rotulo for linha in r.botoes for b in linha]
+ok(plano_l["orcamento"] == round(500 / 4.3, 2) and "✂️ Tirar lanches" in rotulos_r
+   and "💰 Aumentar para R$ 610,00/mês" in rotulos_r,
+   "compra do mês: o botão mostra o valor por mês (R$ 140/semana x 4,3) e aparece [Tirar lanches]")
+s = asyncio.run(atendimento.acao("o2", "pl:ajo:lanches"))
+plano_l2 = banco.plano_atual("o2")
+ok(not cardapio.tem_lanches(plano_l2) and "lanche" not in banco.usuario("o2")["refeicoes"]
+   and plano_l2["cesta"]["total"] == 133.90 and "Tirei os lanches" in s[0].texto and not claude.chamadas[2:],
+   "[Tirar lanches] tira do plano e do perfil e refaz a conta, sem chamar a IA")
+banco.obter_ou_criar_usuario("c9")
+banco.atualizar_perfil("c9", nome="Bia", adultos=2, criancas=0, refeicoes=["almoco", "jantar"],
+                       dias=[d for d, _ in cardapio.DIAS], periodo="semana", orcamento=60.0, cadastro_passo="orcamento")
+t_orc = cadastro.tela_do_passo(banco.usuario("c9"), "orcamento")
+sug = cadastro.sugerir_orcamento(banco.usuario("c9"))
+ok("bem abaixo" in t_orc.texto and any(b.acao == "cad:orc:sug" for linha in t_orc.botoes for b in linha),
+   f"cadastro: orçamento muito abaixo da sugestão (R$ 60 x R$ {sug:.0f}) avisa já na escolha")
+cadastro.acao("c9", "cad:orc:sug")
+ok(banco.usuario("c9")["orcamento"] == sug and "bem abaixo" not in cadastro.tela_do_passo(banco.usuario("c9"), "orcamento").texto,
+   "[Usar R$ sugerido] volta para a sugestão e o aviso some")
+
+secao("C10: receita acompanha o tamanho da família")
+novo_banco()
+gemini, claude = instalar_ias()
+criar_usuario()
+claude.fila = [para_ia(plano_valido())]
+asyncio.run(cardapio.gerar_plano("u1"))
+receita_ia = {"ingredientes": ["arroz"], "passos": ["Cozinhe."], "tempo_min": 30, "dica": ""}
+gemini.fila = [dict(receita_ia)]
+rec1 = asyncio.run(cardapio.receita("u1", "seg", "almoco"))
+ok(rec1["porcoes"] == 2.5 and "arroz 250 g" in gemini.chamadas[-1]["mensagens"][0]["texto"],
+   "receita guarda para quantas porções foi escrita (2,5)")
+banco.atualizar_perfil("u1", adultos=4)  # agora 4,5 porções
+gemini.fila = [dict(receita_ia)]
+rec2 = asyncio.run(cardapio.receita("u1", "seg", "almoco"))
+briefing_r = gemini.chamadas[-1]["mensagens"][0]["texto"]
+ok(len(gemini.chamadas) == 2 and rec2["porcoes"] == 4.5 and "arroz 450 g" in briefing_r and "cebola 2 un" in briefing_r
+   and "2.5 -> 4.5" in briefing_r, "família mudou: a receita é refeita com as quantidades na nova proporção")
+tela_rec = telas.receita(banco.plano_atual("u1"), banco.usuario("u1"), "seg", "almoco", rec2)
+ok("Receita ajustada para 4,5 porções" in tela_rec.texto and "continua para 2,5 porções" in tela_rec.texto,
+   "a tela da receita avisa que a lista de compras não mudou sozinha")
+asyncio.run(cardapio.receita("u1", "seg", "almoco"))
+ok(len(gemini.chamadas) == 2, "mesma família: a receita guardada é reaproveitada (sem nova chamada)")
+
+# =======================================================================================
 secao("Cadastro com botões")
 novo_banco()
 banco.obter_ou_criar_usuario("c1")

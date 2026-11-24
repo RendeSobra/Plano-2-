@@ -7,6 +7,7 @@ estrutura, alergias, utensílios, repetição de pratos, embalagens e orçamento
 import copy
 import json
 import logging
+import math
 import re
 from collections.abc import Awaitable, Callable
 
@@ -37,6 +38,7 @@ NOME_DIA = dict(DIAS)
 NOME_REFEICAO = {k: n for k, n, _ in REFEICOES}
 ICONE_REFEICAO = {k: i for k, _, i in REFEICOES}
 PRINCIPAIS = {"almoco", "jantar"}  # onde vale "o mesmo prato no máximo 1 vez por semana"
+REPETIR_SEMANA_PASSADA_MAX = 2      # a partir de quantos pratos repetidos da semana passada o plano é refeito
 
 ETAPAS = ["Vendo as promoções da semana", "Escolhendo as receitas", "Calculando a cesta",
           "Conferindo o orçamento", "Finalizando"]
@@ -248,7 +250,9 @@ def conferir(plano: dict, perfil: dict, calc: dict, orcamento: float,
     preferidos = {restricoes.normalizar(p) for p in favoritos(perfil)}
     repetiu = [p for p in (semana_passada or []) if restricoes.normalizar(p) in vistos
                and restricoes.normalizar(p) not in preferidos]
-    if repetiu:
+    if len(repetiu) >= REPETIR_SEMANA_PASSADA_MAX:  # 1 coincidência ("arroz, feijão e frango") é aviso
+        graves.append(f"repete {len(repetiu)} pratos da semana passada (troque por outros): " + ", ".join(repetiu))
+    elif repetiu:
         avisos.append("repete pratos da semana passada: " + ", ".join(repetiu))
 
     if orcamento and calc["total"] > orcamento + 0.009:
@@ -404,6 +408,7 @@ async def gerar_plano(usuario: str, pedido: str = "", progresso: Progresso = _na
         **plano,
         "cesta": calc,
         "orcamento": orcamento,
+        "porcoes": cesta.porcoes(perfil.get("adultos"), perfil.get("criancas")),
         "despensa_inicial": despensa,
         "receitas": {},
         "promocoes": {str(p["id"]): p for p in promos},
@@ -414,6 +419,59 @@ async def gerar_plano(usuario: str, pedido: str = "", progresso: Progresso = _na
     conteudo["id"] = banco.salvar_plano(usuario, conteudo)
     banco.atualizar_perfil(usuario, despensa=despensa)
     return conteudo
+
+
+# --- plano acima do orçamento (Pedido I, lacuna 3) ---------------------------------------
+# Quando nenhum modelo fecha no orçamento, o melhor plano é entregue com o aviso de quanto
+# passou e três saídas: tirar os lanches, aumentar o orçamento ou refazer com pratos mais
+# simples. As duas primeiras são só conta (sem IA, sem custo); a terceira monta de novo.
+def _salvar(plano: dict) -> dict:
+    banco.atualizar_plano(plano["id"], {k: v for k, v in plano.items() if k not in ("id", "criado_em")})
+    return plano
+
+
+def excesso(plano: dict) -> float:
+    """Quanto o plano passou do orçamento (0 se coube)."""
+    return round(max(0.0, plano["cesta"]["total"] - (plano.get("orcamento") or 0)), 2)
+
+
+def tem_lanches(plano: dict) -> bool:
+    return any(r["tipo"] == "lanche" for r in plano.get("refeicoes", []))
+
+
+def valor_para_caber(plano: dict) -> float:
+    """O orçamento semanal (arredondado para cima, de 10 em 10) em que o plano atual cabe."""
+    return float(math.ceil(plano["cesta"]["total"] / 10 - 1e-9) * 10)
+
+
+def tirar_lanches(usuario: str) -> dict:
+    """Tira os lanches do plano atual e do perfil (os próximos planos também vêm sem) e refaz a conta."""
+    plano = banco.plano_atual(usuario)
+    mantidas = [r for r in plano["refeicoes"] if r["tipo"] != "lanche"]
+    plano["receitas"] = {k: v for k, v in (plano.get("receitas") or {}).items() if not k.endswith(":lanche")}
+    plano["refeicoes"] = mantidas
+    plano["cesta"] = cesta.calcular(plano, plano.get("despensa_inicial") or {})
+    perfil = banco.usuario(usuario)
+    banco.atualizar_perfil(usuario, refeicoes=[r for r in perfil.get("refeicoes") or [] if r != "lanche"])
+    return _salvar(plano)
+
+
+def aumentar_orcamento(usuario: str) -> dict:
+    """Sobe o orçamento (perfil e plano atual) para o valor em que o plano cabe."""
+    plano = banco.plano_atual(usuario)
+    semanal = valor_para_caber(plano)
+    perfil = banco.usuario(usuario)
+    no_perfil = float(math.ceil(semanal * 4.3 / 10) * 10) if perfil.get("periodo") == "mes" else semanal
+    banco.atualizar_perfil(usuario, orcamento=no_perfil)
+    plano["orcamento"] = orcamento_semanal(banco.usuario(usuario))
+    return _salvar(plano)
+
+
+def pedido_mais_simples(plano: dict) -> str:
+    """O pedido especial para refazer o plano mais barato (vai para o modelo junto com o perfil)."""
+    return (f"Pratos mais simples e baratos: o plano anterior passou R$ {excesso(plano):.2f} do orçamento. "
+            "Use proteínas baratas (ovo, frango, carne moída), mais feijão, legumes da época e "
+            "embalagens menores; repita o café da manhã nos dias da semana.")
 
 
 # --- troca de um prato --------------------------------------------------------------
@@ -510,18 +568,32 @@ async def receita(usuario: str, dia: str, tipo: str) -> dict:
     """Ingredientes na quantidade da família, tempo e passo a passo (gerada uma vez e guardada no plano)."""
     plano = banco.plano_atual(usuario)
     chave_receita = f"{dia}:{tipo}"
-    if chave_receita in plano.get("receitas", {}):
-        return plano["receitas"][chave_receita]
     perfil = banco.usuario(usuario)
-    ref = plano["refeicoes"][indice(plano, dia, tipo)]
     porc = cesta.porcoes(perfil.get("adultos"), perfil.get("criancas"))
+    guardada = (plano.get("receitas") or {}).get(chave_receita)
+    # Guardada vale enquanto a família for do mesmo tamanho (C10: ao escalar porções, ajustar
+    # também o modo de preparo). Receita antiga, sem 'porcoes', continua valendo.
+    if guardada and float(guardada.get("porcoes", porc)) == porc:
+        return guardada
+    ref = plano["refeicoes"][indice(plano, dia, tipo)]
+    porc_plano = float(plano.get("porcoes") or porc)
+    fator = porc / porc_plano if porc_plano else 1.0
+
+    def qtd(i: dict) -> str:
+        valor = float(i["quantidade"]) * fator
+        valor = round(valor * 2) / 2 if i["unidade"] == "un" else round(valor)
+        return f"{valor:g} {i['unidade']}"
+
+    ajuste = ([f"A família mudou desde o plano ({porc_plano:g} -> {porc:g} porções): as quantidades abaixo já "
+               f"estão ajustadas; ajuste também os passos (panela, tempo, quantidade de água)."]
+              if fator != 1 else [])
     briefing = "\n".join(_linhas_perfil(perfil) + [
         f"Prato: {ref['prato']} ({NOME_REFEICAO[tipo]}), para {porc:g} porções.",
-        "Ingredientes (quantidades exatas para a família): "
-        + "; ".join(f"{i['item']} {i['quantidade']:g} {i['unidade']}" for i in ref["ingredientes"]),
+        "Ingredientes (quantidades exatas para a família): " + "; ".join(f"{i['item']} {qtd(i)}"
+                                                                       for i in ref["ingredientes"]),
         f"Equipamentos: {', '.join(UTENSILIOS[e] for e in ref.get('equipamentos') or []) or 'fogão'}.",
         f"Tempo previsto: {ref.get('tempo_min')} min.",
-    ] + ([f"Sobra planejada: {ref['sobra_planejada']}"] if ref.get("sobra_planejada") else []))
+    ] + ajuste + ([f"Sobra planejada: {ref['sobra_planejada']}"] if ref.get("sobra_planejada") else []))
     mensagens = [{"papel": "usuario", "texto": briefing}]
 
     def conferir_receita(resposta) -> list[str]:
@@ -536,7 +608,7 @@ async def receita(usuario: str, dia: str, tipo: str) -> dict:
                                     esquema_json=ESQUEMA_RECEITA, tempo=60, conferir=conferir_receita)
     if resposta.problemas:
         raise PlanoInvalido("; ".join(resposta.problemas))
-    rec = ler_json(resposta.texto)
+    rec = {**ler_json(resposta.texto), "porcoes": porc, "porcoes_plano": porc_plano}
 
     plano.setdefault("receitas", {})[chave_receita] = rec
     banco.atualizar_plano(plano["id"], {k: v for k, v in plano.items() if k not in ("id", "criado_em")})

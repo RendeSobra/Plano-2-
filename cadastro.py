@@ -34,6 +34,14 @@ PADROES = {"refeicoes": ["almoco", "jantar"], "dias": [d for d, _ in DIAS], "ute
 # Custo médio por porção em Goiânia (sugestão de orçamento, não é preço real)
 CUSTO_PORCAO = {"cafe": 3.5, "almoco": 7.0, "jantar": 6.5, "lanche": 3.0, "marmita": 6.5}
 PASSO_ORCAMENTO = 20.0
+# Abaixo de 75% da sugestão, o cadastro avisa que talvez o plano não feche (Pedido I, lacuna 3)
+ORCAMENTO_BAIXO = 0.75
+
+
+def orcamento_baixo(perfil: dict) -> float | None:
+    """A sugestão para a família, quando o orçamento escolhido está muito abaixo dela."""
+    sugestao = sugerir_orcamento(perfil)
+    return sugestao if (perfil.get("orcamento") or 0) < sugestao * ORCAMENTO_BAIXO else None
 
 
 # --- estado ------------------------------------------------------------------------
@@ -157,6 +165,11 @@ def tela_do_passo(perfil: dict, passo: str, editar_msg: bool = False) -> Saida:
              f"Ajuste se quiser:\n\n*{brl(perfil.get('orcamento') or 0)}*\n\n{resumo(perfil)}")
         botoes = [[Botao(f"− {brl(PASSO_ORCAMENTO)}", "cad:orc:-"), Botao(f"+ {brl(PASSO_ORCAMENTO)}", "cad:orc:+")],
                   [Botao("✅ Confirmar", "cad:ok")]]
+        sugestao = orcamento_baixo(perfil)
+        if sugestao:
+            t += (f"\n\n⚠️ Esse valor fica bem abaixo do que costuma custar para a sua família "
+                  f"(uns {brl(sugestao)} por {periodo}). Posso tentar, mas talvez o plano não feche nele.")
+            botoes.insert(1, [Botao(f"↩️ Usar {brl(sugestao)}", "cad:orc:sug")])
         return tela(t, botoes, editar_msg)
     raise ValueError(f"passo desconhecido: {passo}")
 
@@ -252,7 +265,10 @@ def acao(usuario: str, acao_txt: str) -> list[Saida]:
         return avancar(usuario)
 
     if tipo == "orc":
-        if partes[2] in "+-":
+        if partes[2] == "sug":
+            perfil = banco.atualizar_perfil(usuario, orcamento=sugerir_orcamento(perfil))
+            return [tela_do_passo(perfil, passo, True)]
+        if partes[2] in ("+", "-"):
             delta = PASSO_ORCAMENTO if partes[2] == "+" else -PASSO_ORCAMENTO
             perfil = banco.atualizar_perfil(usuario, orcamento=max(PASSO_ORCAMENTO, (perfil.get("orcamento") or 0) + delta))
             return [tela_do_passo(perfil, passo, True)]

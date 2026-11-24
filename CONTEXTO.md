@@ -122,7 +122,7 @@ Tabelas: `usuarios`, `historico` (30 últimas), `planos` (3 últimos; o mais nov
 ## 5. Como rodar e testar
 
 Veja o [README](README.md). Testes automáticos: `.venv\Scripts\python testes\testar.py`
-(**124 de 124 OK** em 24/11/2026). Ajudantes do teste pelo celular em `testes/celular/`.
+(**145 de 145 OK** em 24/11/2026). Ajudantes do teste pelo celular em `testes/celular/`.
 
 ## 6. Resultado do teste real no celular (23/11/2026)
 

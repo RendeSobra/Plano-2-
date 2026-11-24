@@ -118,7 +118,10 @@ sal, especiarias, molhos e condimentos secos.
 Regras (o sistema confere tudo em código e devolve o plano se algo falhar):
 1. Planeje EXATAMENTE as refeições pedidas (dia + tipo), cada uma uma vez.
 2. Restrições e alergias: NUNCA use ingrediente proibido, nem em nome de prato. Na \
-dúvida, não use. Para lactose prefira versões "sem lactose" escritas assim.
+dúvida, não use. Pratos que costumam levar o ingrediente (purê, strogonoff, empadão, \
+lasanha, escondidinho e pamonha levam leite; feijoada, galinhada e tropeiro levam carne) \
+só entram com a versão segura escrita no nome: "Purê de batata sem lactose", "Feijão \
+tropeiro vegetariano".
 3. Use só os equipamentos da cozinha da pessoa.
 4. Variedade: o mesmo prato no máximo 1 vez por semana no almoço/jantar; evite os \
 pratos da semana passada, salvo os favoritos; nunca use os rejeitados.

@@ -28,6 +28,7 @@ from dataclasses import dataclass
 import banco
 import ia
 import ia_claude
+import restricoes
 from ia_comum import ErroIA, RespostaIA
 
 log = logging.getLogger("rende.roteador")
@@ -120,12 +121,13 @@ def escada(tarefa: str, *, complexo: bool = False, tem_audio: bool = False) -> l
 
 def categoria(problemas: list[str]) -> str:
     """Resumo do motivo de uma reprovação, para o log e o /custos."""
-    # O problema de orçamento traz nomes de itens ("ovo R$ 40,00") como dica: as outras
-    # regras olham só os demais problemas, para "ovo" ali não virar "alergia".
+    # Nomes de pratos e itens aparecem em vários problemas ("Feijão tropeiro com ovo" repetido,
+    # "ovo R$ 40,00" na dica de orçamento). Alergia é reconhecida pelo rótulo que a conferência
+    # escreve, "(Lactose)", "(Ovo)"..., e as outras regras não olham o problema de orçamento.
     orcamento = any("orçamento" in p.lower() for p in problemas)
     texto = " ".join(p for p in problemas if "orçamento" not in p.lower()).lower()
-    regras = [("alergia/restrição", ("lactose", "glúten", "ovo", "amendoim", "frutos do mar", "peixe", "soja",
-                                     "vegetariano", "(outro)")),
+    rotulos_alergia = tuple(f"({n.lower()})" for n in restricoes.NOMES.values()) + ("(outro)",)
+    regras = [("alergia/restrição", rotulos_alergia),
               ("orçamento", ()),
               ("repetição", ("mais de uma vez", "rejeitado", "igual ao antigo", "semana passada")),
               ("utensílios", ("não tem",)),
