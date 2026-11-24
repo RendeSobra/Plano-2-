@@ -4,7 +4,9 @@ nem o Telegram, e usam um banco de dados só na memória.
 Para rodar:   .venv\\Scripts\\python testes\\testar.py
 """
 import asyncio
+import copy
 import json
+import re
 import logging
 import os
 import sys
@@ -53,6 +55,31 @@ def secao(titulo: str) -> None:
 
 def novo_banco() -> None:
     banco.conectar(":memory:")
+
+
+class _Coletor(logging.Handler):
+    def __init__(self):
+        super().__init__(logging.DEBUG)
+        self.textos: list[str] = []
+
+    def emit(self, registro: logging.LogRecord) -> None:
+        self.textos.append(registro.getMessage())
+
+
+def capturar_log(nome: str, funcao) -> list[str]:
+    """Roda funcao() e devolve as mensagens que o logger `nome` (e os filhos dele) registraram."""
+    logger = logging.getLogger(nome)
+    coletor, nivel_antigo, propaga_antes = _Coletor(), logger.level, logger.propagate
+    logger.addHandler(coletor)
+    logger.setLevel(logging.DEBUG)
+    logger.propagate = False  # não imprime na tela durante os testes
+    try:
+        funcao()
+    finally:
+        logger.removeHandler(coletor)
+        logger.setLevel(nivel_antigo)
+        logger.propagate = propaga_antes
+    return coletor.textos
 
 
 # --- IAs simuladas ---------------------------------------------------------------------
@@ -349,18 +376,41 @@ ok(cardapio.caso_complexo(PERFIL, promos2, "otimiza com as promoções") and not
 
 
 class ClienteClaudeFalso:
-    def __init__(self):
+    """Imita o AsyncAnthropic: anota se a chamada foi por create ou por stream."""
+
+    def __init__(self, stop_reason: str = "end_turn"):
         self.parametros = None
+        self.usou = None
+        self.stop_reason = stop_reason
         self.messages = self
 
     def with_options(self, **_):
         return self
 
-    async def create(self, **parametros):
-        self.parametros = parametros
+    def _resposta(self):
         from types import SimpleNamespace as NS
-        return NS(stop_reason="end_turn", content=[NS(type="text", text="oi")],
+        return NS(stop_reason=self.stop_reason, content=[NS(type="text", text="oi")],
                   usage=NS(input_tokens=50, output_tokens=5, cache_read_input_tokens=1800, cache_creation_input_tokens=0))
+
+    async def create(self, **parametros):
+        self.parametros, self.usou = parametros, "create"
+        return self._resposta()
+
+    def stream(self, **parametros):
+        self.parametros, self.usou = parametros, "stream"
+        cliente = self
+
+        class _Fluxo:
+            async def __aenter__(self):
+                return self
+
+            async def __aexit__(self, *_):
+                return False
+
+            async def get_final_message(self):
+                return cliente._resposta()
+
+        return _Fluxo()
 
 
 os.environ["ANTHROPIC_API_KEY"] = "sk-ant-teste"
@@ -374,6 +424,11 @@ ok(pr["system"][0] == {"type": "text", "text": "FIXO", "cache_control": {"type":
 ok(not any(k in pr for k in ("thinking", "temperature", "top_p", "top_k")) and pr["tool_choice"] == {"type": "auto"}
    and pr["output_config"] == {"effort": "low"}, "Claude: sem thinking/temperature/top_p/top_k; tool_choice auto; effort explícito")
 ok(resp.cache_leitura == 1800 and resp.tokens_entrada == 50, "Claude: lê usage.cache_read_input_tokens")
+ok(falso.usou == "stream" and pr["max_tokens"] == 32000,
+   "Claude: resposta por streaming com limite de 32 mil tokens (o cardápio não é mais cortado no meio)")
+ia_claude._cliente = ClienteClaudeFalso(stop_reason="max_tokens")
+avisos = capturar_log("rende.ia_claude", lambda: asyncio.run(ia_claude.gerar(modelo=SONNET, sistema="FIXO", mensagens=X)))
+ok(any("cortada" in a for a in avisos), "Claude: resposta cortada no limite de tokens fica registrada no log")
 ia_claude._cliente = None
 os.environ.pop("ANTHROPIC_API_KEY")
 
@@ -534,6 +589,55 @@ ok("Sonnet" in texto_custos and "Gemini" in texto_custos and "Subidas de nível 
    and "Limites hoje: Haiku" in texto_custos and "pedido complexo: Sonnet" in texto_custos,
    "/custos: gasto por modelo, quem fez o quê, subidas e limites")
 ok(atendimento.eh_admin("999") and not atendimento.eh_admin("u1"), "/custos só para ADMIN_IDS")
+
+# =======================================================================================
+secao("Troca de prato com o orçamento apertado (teste real de 24/11)")
+novo_banco()
+gemini, claude = instalar_ias()
+criar_usuario()
+claude.fila = [plano_valido()]
+plano = asyncio.run(cardapio.gerar_plano("u1"))
+i_tj = cardapio.indice(plano, "ter", "jantar")
+sem_prato = copy.deepcopy(plano)
+del sem_prato["refeicoes"][i_tj]
+calc_sem = cesta.calcular(sem_prato, plano.get("despensa_inicial") or {})
+folga_exata = plano["orcamento"] - calc_sem["total"]
+
+claude.chamadas.clear()
+claude.fila = [{"refeicao": refeicao("ter", "jantar", "Arroz carreteiro", [("arroz", 300, "g"), ("carne moída", 200, "g")]),
+                "produtos_novos": []}]
+asyncio.run(cardapio.trocar_prato("u1", "ter", "jantar"))
+briefing = claude.chamadas[0]["mensagens"][0]["texto"]
+ok(f"NO MÁXIMO R$ {folga_exata:.2f}" in briefing,
+   f"troca: o modelo recebe a folga exata, calculada sem o prato antigo (R$ {folga_exata:.2f})")
+ok("Sobras das embalagens já compradas" in briefing and "arroz" in briefing.split("Sobras das embalagens já compradas")[1],
+   "troca: o modelo recebe as sobras das embalagens (usar não custa nada)")
+
+atual = banco.plano_atual("u1")
+apertado = {k: v for k, v in atual.items() if k not in ("id", "criado_em")}
+apertado["orcamento"] = 50.0
+banco.atualizar_plano(atual["id"], apertado)
+claude.chamadas.clear()
+s = asyncio.run(atendimento.trocar_prato("u1", "ter", "jantar"))
+ok(not claude.chamadas and "orçamento" in s[0].texto and "tentar de novo" not in s[0].texto,
+   "troca sem folga no orçamento: avisa a pessoa sem gastar com a IA")
+banco.atualizar_plano(atual["id"], {k: v for k, v in atual.items() if k not in ("id", "criado_em")})
+
+caro = {"refeicao": refeicao("ter", "jantar", "Picanha na chapa", [("picanha", 1000, "g")]),
+        "produtos_novos": [produto("picanha", "peça 1 kg", 1000, "g", 150.0, "Açougue e aves", True)]}
+claude.fila = [caro, caro, caro]
+claude.chamadas.clear()
+s = asyncio.run(atendimento.trocar_prato("u1", "ter", "jantar"))
+ok(len(claude.chamadas) == 3 and "orçamento" in s[0].texto and "tentar de novo" not in s[0].texto,
+   "troca que estoura o orçamento em todos os níveis explica o motivo, sem convidar a repetir")
+
+secao("Privacidade do registro (log)")
+textos_log = capturar_log("rende", lambda: asyncio.run(atendimento.trocar_prato("5550001112", "ter", "jantar")))
+ok(textos_log and not any("5550001112" in t for t in textos_log), "o log de uma troca que falhou não grava o ID da conta")
+suspeitos = [f"{arq.name}:{n}" for arq in sorted(RAIZ.glob("*.py"))
+             for n, linha in enumerate(arq.read_text(encoding="utf-8").splitlines(), 1)
+             if re.search(r"\blog\.\w+\(.*\busuario\b", linha)]
+ok(not suspeitos, f"nenhuma linha de log do código grava o ID do usuário {suspeitos}")
 
 # =======================================================================================
 secao("Formato para cada IA")

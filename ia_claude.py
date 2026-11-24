@@ -13,11 +13,15 @@ Regras da API atual (conferidas em platform.claude.com/docs, nov/2026):
 - effort sempre explícito em output_config (o roteador escolhe por tarefa);
 - prompt caching: as instruções fixas (e as ferramentas, que vêm antes delas)
   vão com cache_control; a parte que muda vai num bloco separado, sem cache;
-- sempre conferimos stop_reason: "refusal" vira RespostaIA(recusou=True).
+- sempre conferimos stop_reason: "refusal" vira RespostaIA(recusou=True); "max_tokens"
+  (resposta cortada) fica no log e a conferência reprova, o que sobe de nível;
+- a resposta vem por streaming (messages.stream + get_final_message): o SDK exige isso
+  para limites de saída grandes, e o raciocínio do modelo também conta nesse limite.
 O Claude não entende áudio; áudio fica com o Gemini (o roteador cuida disso).
 """
 import base64
 import json
+import logging
 import os
 import uuid
 
@@ -25,8 +29,12 @@ import anthropic
 
 from ia_comum import Chamada, ErroIA, RespostaIA
 
-TEMPO_MAXIMO = 120  # segundos
-MAX_TOKENS = 16000
+log = logging.getLogger("rende.ia_claude")
+
+TEMPO_MAXIMO = 120  # segundos (por leitura do streaming)
+# Em 24/11 o Sonnet usou os 16 mil tokens inteiros (raciocínio + JSON) e o cardápio saiu
+# cortado. Só se paga o que o modelo usa; o limite maior evita refazer tudo no Opus.
+MAX_TOKENS = 32000
 
 _cliente: anthropic.AsyncAnthropic | None = None
 
@@ -120,7 +128,8 @@ async def gerar(*, modelo: str, sistema: str, mensagens: list[dict], sistema_ext
         parametros["tool_choice"] = {"type": "auto"}
 
     try:
-        resposta = await _obter_cliente().with_options(timeout=tempo).messages.create(**parametros)
+        async with _obter_cliente().with_options(timeout=tempo).messages.stream(**parametros) as fluxo:
+            resposta = await fluxo.get_final_message()
     except anthropic.RateLimitError as erro:
         raise ErroIA(f"{modelo}: limite de uso (429)", cota=True) from erro
     except anthropic.APIStatusError as erro:
@@ -135,6 +144,8 @@ async def gerar(*, modelo: str, sistema: str, mensagens: list[dict], sistema_ext
 
     if resposta.stop_reason == "refusal":  # sempre conferido antes de ler o conteúdo
         return RespostaIA(recusou=True, **base)
+    if resposta.stop_reason == "max_tokens":
+        log.warning("Claude: resposta de %s cortada no limite de %d tokens de saída", modelo, MAX_TOKENS)
 
     texto = "".join(b.text for b in resposta.content if b.type == "text").strip()
     chamadas = [Chamada(id=b.id, nome=b.name, args=dict(b.input or {}))

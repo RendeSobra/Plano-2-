@@ -309,7 +309,7 @@ async def _receber_arquivo(update: Update, context: ContextTypes.DEFAULT_TYPE, *
             arquivo = await context.bot.get_file(file_id)
             dados = bytes(await arquivo.download_as_bytearray())
         except TelegramError as erro:
-            log.error("Não consegui baixar o arquivo do usuário %s: %s", usuario, erro)
+            log.error("Não consegui baixar um arquivo mandado pela pessoa: %s", erro)
             await mostrar(context, chat_id, usuario, [telas.texto(prompts.ERRO_DOWNLOAD)])
             return
         saidas = await atendimento.responder(usuario, update.effective_message.caption or "",

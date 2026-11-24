@@ -46,6 +46,14 @@ class PlanoInvalido(Exception):
     """A IA não conseguiu um plano que passe na conferência (ex.: alergia) depois das tentativas."""
 
 
+class SemFolga(PlanoInvalido):
+    """A troca não cabe no orçamento. `folga`: quanto sobra para o prato novo (negativo = já passou)."""
+
+    def __init__(self, mensagem: str, folga: float):
+        super().__init__(mensagem)
+        self.folga = folga
+
+
 # --- esquemas JSON pedidos à IA ------------------------------------------------
 _INGREDIENTE = {"type": "object", "additionalProperties": False,
                 "required": ["item", "quantidade", "unidade"],
@@ -352,8 +360,21 @@ async def trocar_prato(usuario: str, dia: str, tipo: str, pedido: str = "") -> d
     i = indice(atual, dia, tipo)
     antigo = atual["refeicoes"][i]
     orcamento = atual.get("orcamento") or orcamento_semanal(perfil)
-    folga = orcamento - atual["cesta"]["total"] + atual["cesta"]["custo_refeicoes"][i]
-    outros = [f"{NOME_DIA[r['dia']]} {NOME_REFEICAO[r['tipo']]}: {r['prato']}"
+    # Folga exata: a lista recalculada SEM o prato antigo (embalagens inteiras), não uma
+    # conta proporcional, que prometia mais dinheiro do que existia (teste real de 24/11).
+    sem_prato = copy.deepcopy(atual)
+    del sem_prato["refeicoes"][i]
+    calc_sem = cesta.calcular(sem_prato, atual.get("despensa_inicial") or {})
+    folga = round(orcamento - calc_sem["total"], 2)
+    if folga < 0:  # nem um prato de graça caberia: não gasta com a IA
+        raise SemFolga(f"sem esse prato a lista já passa R$ {-folga:.2f} do orçamento", folga)
+    tamanhos = {cesta.chave(p["item"]): float(p["tamanho"]) for p in atual.get("produtos", [])}
+    sobras = []
+    for linha in calc_sem["linhas"]:
+        sobra = linha["pacotes"] * tamanhos.get(cesta.chave(linha["item"]), 0) - (linha["precisa"] - linha["da_despensa"])
+        if sobra > 0:
+            sobras.append(f"{linha['item']} {sobra:g} {linha['unidade']}")
+    outros =[f"{NOME_DIA[r['dia']]} {NOME_REFEICAO[r['tipo']]}: {r['prato']}"
               for j, r in enumerate(atual["refeicoes"]) if j != i]
     produtos = [f"{p['item']} ({p['embalagem']}, {p['tamanho']:g} {p['unidade']}, R$ {p['preco']:.2f})"
                 for p in atual.get("produtos", [])]
@@ -367,9 +388,11 @@ async def trocar_prato(usuario: str, dia: str, tipo: str, pedido: str = "") -> d
     ] + manter_sobra + [
         "Não repita nenhum destes pratos da semana: " + "; ".join(outros),
         "Produtos já na lista (reaproveite os itens e use o MESMO nome em 'item'): " + "; ".join(produtos),
-        f"Orçamento da semana R$ {orcamento:.2f}; total atual R$ {atual['cesta']['total']:.2f}. "
-        f"O prato novo pode custar até uns R$ {max(folga, 0):.2f} em compras novas.",
-    ] + ([f"Pratos rejeitados (NÃO use): {'; '.join(rejeitados(perfil))}"] if rejeitados(perfil) else []))
+        f"Orçamento da semana R$ {orcamento:.2f}. Sem o prato antigo, a lista fica em R$ {calc_sem['total']:.2f}: "
+        f"o prato novo pode acrescentar NO MÁXIMO R$ {folga:.2f} em embalagens novas (conta o preço da "
+        f"embalagem inteira, não só o que o prato usa). Se não couber, monte o prato só com o que já está na lista.",
+    ] + ([f"Sobras das embalagens já compradas (usar não custa nada): {'; '.join(sobras)}"] if sobras else [])
+      + ([f"Pratos rejeitados (NÃO use): {'; '.join(rejeitados(perfil))}"] if rejeitados(perfil) else []))
     mensagens = [{"papel": "usuario", "texto": briefing}]
     conferidos: dict[int, tuple] = {}
 
@@ -398,6 +421,8 @@ async def trocar_prato(usuario: str, dia: str, tipo: str, pedido: str = "") -> d
                                     esquema_json=ESQUEMA_TROCA, tempo=120, conferir=conferir_troca)
     novo_plano, calc, graves = conferidos.get(id(resposta)) or (None, None, resposta.problemas or ["JSON inválido"])
     if graves:  # na troca, nada de passar do orçamento: o plano fica como estava
+        if roteador.categoria(graves) == "orçamento":
+            raise SemFolga("; ".join(graves), folga)
         raise PlanoInvalido("; ".join(graves))
 
     novo_plano["cesta"] = calc

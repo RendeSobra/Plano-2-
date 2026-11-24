@@ -155,6 +155,9 @@ ESQUECIDO = "Pronto, apaguei tudo. Se quiser voltar, é só mandar /start. Foi b
 ESQUECER_CANCELADO = "Ufa! Nada foi apagado. 😊"
 PLANO_ERRO = ("Não consegui montar um plano que respeite tudo o que você pediu agora 😕 "
               "Pode tentar de novo daqui a pouco?")
+TROCA_SEM_FOLGA = ("Não achei um prato novo que caiba no orçamento 😕 Sem o prato atual, sobram só {folga} "
+                   "para as compras dele. Dá para trocar outro prato da semana, ou aumentar o orçamento "
+                   "no /perfil e refazer o plano.")
 PLANO_PRECISA_CADASTRO = "Antes de montar o plano, preciso terminar seu cadastro rapidinho 🙂"
 SEM_PLANO = "Você ainda não tem um plano. Quer que eu monte agora?"
 

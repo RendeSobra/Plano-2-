@@ -87,7 +87,7 @@ def perguntar_esquecer() -> list[Saida]:
 async def esquecer(usuario: str) -> list[Saida]:
     _versoes[usuario] += 1
     banco.apagar_usuario(usuario)
-    log.info("Dados do usuário %s apagados a pedido (LGPD).", usuario)
+    log.info("Dados de um usuário apagados a pedido (LGPD).")
     return [Saida(texto=prompts.ESQUECIDO, editar=True)]
 
 
@@ -146,7 +146,7 @@ async def _acao_plano(usuario: str, acao_txt: str) -> list[Saida]:
         try:
             rec = await cardapio.receita(usuario, d, t)
         except (cardapio.PlanoInvalido, ErroIA) as erro:
-            log.error("Receita falhou para %s: %s", usuario, erro)
+            log.error("Receita falhou: %s", erro)
             return [telas.texto("Não consegui preparar essa receita agora 😕 Tenta de novo daqui a pouco?")]
         if partes[1] == "rec":
             return [telas.receita(banco.plano_atual(usuario), perfil, d, t, rec)]
@@ -169,7 +169,7 @@ async def montar_plano(usuario: str, pedido: str = "", progresso: cardapio.Progr
         try:
             plano = await cardapio.gerar_plano(usuario, pedido, progresso)
         except (cardapio.PlanoInvalido, ErroIA) as erro:
-            log.error("Plano falhou para %s: %s", usuario, erro)
+            log.error("Plano falhou: %s", erro)
             return [telas.texto(prompts.PLANO_ERRO)]
         banco.adicionar_mensagem(usuario, "assistente",
                                  f"(Montei o plano da semana: total {telas.brl(plano['cesta']['total'])} "
@@ -182,8 +182,11 @@ async def trocar_prato(usuario: str, dia: str, tipo: str, pedido: str = "") -> l
         try:
             antes = banco.plano_atual(usuario)["refeicoes"][cardapio.indice(banco.plano_atual(usuario), dia, tipo)]["prato"]
             plano = await cardapio.trocar_prato(usuario, dia, tipo, pedido)
+        except cardapio.SemFolga as erro:  # repetir não adianta: explica em vez de convidar a tentar de novo
+            log.info("Troca sem espaço no orçamento: %s", erro)
+            return [telas.texto(prompts.TROCA_SEM_FOLGA.format(folga=telas.brl(max(erro.folga, 0))))]
         except (cardapio.PlanoInvalido, ErroIA, KeyError, TypeError) as erro:
-            log.error("Troca falhou para %s: %s", usuario, erro)
+            log.error("Troca falhou: %s", erro)
             return [telas.texto("Não consegui trocar esse prato agora 😕 Quer tentar de novo?")]
     novo = plano["refeicoes"][cardapio.indice(plano, dia, tipo)]["prato"]
     total, orc = plano["cesta"]["total"], plano["orcamento"]
@@ -296,10 +299,10 @@ async def responder(usuario: str, texto: str, anexo: dict | None = None) -> list
         try:
             ctx, final = await _conversar(usuario, banco.historico(usuario), mensagem, passo_cadastro=passo)
         except ErroIA as erro:
-            log.error("A IA falhou ao responder o usuário %s: %s", usuario, erro)
+            log.error("A IA falhou ao responder: %s", erro)
             return [] if versao != _versoes[usuario] else [telas.texto(prompts.ERRO_IA)]
         if versao != _versoes[usuario]:
-            log.info("Resposta descartada: o usuário %s recomeçou enquanto a IA pensava.", usuario)
+            log.info("Resposta descartada: a pessoa recomeçou enquanto a IA pensava.")
             return []
 
         banco.adicionar_mensagem(usuario, "usuario", texto_hist)
