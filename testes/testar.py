@@ -878,6 +878,23 @@ ok("filters.AUDIO | filters.Document.AUDIO, arquivo_de_audio" in codigo_bot,
    "o bot aceita áudio mandado como arquivo, além da mensagem de voz")
 
 # =======================================================================================
+secao("C2: /custos com o mês e o custo por cardápio")
+novo_banco()
+gemini, claude = instalar_ias()
+criar_usuario("k1")
+claude.fila = [para_ia(plano_valido())]
+asyncio.run(cardapio.gerar_plano("k1"))
+com_lactose_k = plano_valido()
+com_lactose_k["refeicoes"][0]["prato"] = "Arroz com queijo"
+claude.fila = [para_ia(com_lactose_k), para_ia(plano_valido())]
+asyncio.run(cardapio.gerar_plano("k1"))
+texto_k = atendimento.custos()[0].texto
+ok("Subidas de nível hoje:* 1" in texto_k and "Subidas de nível no mês:* 1" in texto_k and "alergia/restrição: 1x" in texto_k,
+   "/custos mostra as subidas de nível do dia e do mês, com o motivo")
+ok("Cardápios no mês:* 2 · custo médio US$ 0,0140 · Opus em 50%" in texto_k,
+   "/custos mostra o custo médio por cardápio e em quantos o Opus entrou")
+
+# =======================================================================================
 secao("Cadastro com botões")
 novo_banco()
 banco.obter_ou_criar_usuario("c1")

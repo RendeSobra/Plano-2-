@@ -11,7 +11,7 @@ O **Pedido I** (mesmo arquivo) manda executar os itens pendentes do H numa ordem
 com decisões do dono que valem por cima do H (ver "Decisões do Pedido I").
 Histórico, testes reais e detalhes: [CONTEXTO.md](CONTEXTO.md).
 
-Testes automáticos: `.venv\Scripts\python testes\testar.py` (**182 de 182 OK em 24/11/2026**).
+Testes automáticos: `.venv\Scripts\python testes\testar.py` (**184 de 184 OK em 24/11/2026**).
 
 ## Pedidos e situação
 
@@ -26,14 +26,14 @@ Testes automáticos: `.venv\Scripts\python testes\testar.py` (**182 de 182 OK em
 | F | Escada de modelos: Gemini → Haiku → Sonnet → Opus, limites por modelo, cache, /custos | ✅ Feito e testado no celular (23/11) |
 | G | Mensagens de troca e PDF sem poluir o chat; contexto no GitHub | ✅ Feito |
 | H | Retomada com a especificação completa (PARTES A a F) | 🔧 PARTE A ✅ (24/11). Itens pendentes: ver Pedido I |
-| I | Executar os pendentes do H sem parar entre etapas + Modo mercado + PDF com caixinhas | 🔧 Custo do cardápio ✅ · C10 ✅ · C9, C11 e Modo mercado ✅ · C6 ✅ (24/11). Próximo: C2 |
+| I | Executar os pendentes do H sem parar entre etapas + Modo mercado + PDF com caixinhas | 🔧 Custo do cardápio ✅ · C10 ✅ · C9, C11 e Modo mercado ✅ · C6 ✅ · C2 ✅ (24/11). Próximo: C3 |
 
 ## Pedido H: situação de cada item da PARTE C (conferido em 24/11/2026)
 
 | Item | Situação | O que falta |
 |---|---|---|
 | C1 Arquitetura | 🟡 | Só a pasta `coletor/` (vem no C13) |
-| C2 Escada de modelos | 🟢 quase | `/custos` mostra os escalonamentos só do dia (pedido: dia e mês). O Haiku usa effort "medium" na troca: conferir na documentação atual se é o certo. Feito em 24/11 (depois do teste real): limite de 32 mil tokens com streaming; a troca recebe a folga exata e as sobras das embalagens; conferir no próximo teste se ela passa de primeira. **Cardápio compacto e Sonnet em effort "low" (Pedido I, 24/11): ver "Custo do cardápio"** |
+| C2 Escada de modelos | ✅ (24/11) | `/custos` mostra as subidas de nível do dia e do mês, o custo médio por cardápio e em quantos o Opus entrou. Haiku na troca com effort "medium" (conferido: o Haiku 5.5 aceita low a max e o padrão dele é medium; a troca custa ~US$ 0,001 e exige conta de orçamento). Limite de saída de 32 mil tokens com streaming (decisão de 24/11). Cardápio compacto e Sonnet em effort "low" (Pedido I): ver "Custo do cardápio" |
 | C3 Escopo | ❌ | Hoje é só uma frase no prompt. Falta o campo `no_escopo` conferido em código, as mensagens fixas com botões, o log "fora_do_escopo" e o teste com 40 mensagens |
 | C4 Personalidade | ✅ | O resumo semanal depende do C14 |
 | C5 Memória | ✅ | Funciona com nomes diferentes do pedido: despensa é uma coluna de `usuarios` e os custos ficam em `uso_ia`. `/perfil` não edita cidade nem localização |
@@ -57,8 +57,8 @@ Sem parar entre os itens; resumo curto ao fim de cada C.
 3. ✅ C10 (conferências), incluindo a lacuna 3 (plano acima do orçamento) (24/11).
 4. ✅ C9, C11 e **Modo mercado** (marcar o que já foi comprado; PDF com caixinhas clicáveis).
 5. ✅ C6 (entender qualquer mensagem) (24/11).
-6. ⏳ **Próximo:** C2 (escada de modelos).
-7. C3 (escopo).
+6. ✅ C2 (escada de modelos) (24/11).
+7. ⏳ **Próximo:** C3 (escopo).
 8. C13 Fases 1 e 2 (o Claude escolhe as redes pelos critérios do dono; não para).
 9. C14 → C15 → C12.
 10. Relatório final (PARTE F) e roteiro do teste no celular (o dono testa depois de trocar as chaves).

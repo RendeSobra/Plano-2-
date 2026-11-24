@@ -468,9 +468,14 @@ def custos() -> list[Saida]:
         linhas += ["", "*Quem fez o quê hoje*"]
         linhas += [f"• {NOMES_TAREFA.get(t['tarefa'], t['tarefa'])}: {NOMES_NIVEL.get(t['nivel'], t['nivel'])} "
                    f"({t['vezes']}x, {dolar(t['custo'] or 0)})" for t in tarefas]
-    subidas = banco.resumo_escalonamentos(hoje)
-    linhas += ["", f"*Subidas de nível hoje:* {sum(s['vezes'] for s in subidas)}"]
-    linhas += [f"• {s['motivo']}: {s['vezes']}x" for s in subidas]
+    for titulo, desde in (("hoje", hoje), ("no mês", mes)):
+        subidas = banco.resumo_escalonamentos(desde)
+        linhas += ["", f"*Subidas de nível {titulo}:* {sum(s['vezes'] for s in subidas)}"]
+        linhas += [f"• {s['motivo']}: {s['vezes']}x" for s in subidas]
+    card = banco.resumo_cardapios(mes)
+    if card["cardapios"]:
+        linhas += ["", f"*Cardápios no mês:* {card['cardapios']} · custo médio {dolar(card['custo'] / card['cardapios'])}"
+                       f" · Opus em {card['com_opus'] / card['cardapios']:.0%}"]
     limites = " · ".join(f"{NOMES_NIVEL[n]} {banco.chamadas_modelo_hoje(roteador.claude(n).modelo)}/{roteador.limite(n)}"
                          for n in ("haiku", "sonnet", "opus"))
     linhas += ["", f"Limites hoje: {limites}", "Preços de tabela. No plano gratuito do Gemini o custo real é zero."]

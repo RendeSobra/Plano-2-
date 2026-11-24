@@ -387,6 +387,15 @@ def resumo_escalonamentos(desde_dia: str) -> list[dict]:
     return [dict(l) for l in linhas]
 
 
+def resumo_cardapios(desde_dia: str) -> dict:
+    """Cardápios gerados desde um dia: quantos, custo total e quantos precisaram do Opus.
+    Cada cardápio começa numa chamada sem subida (escalonou_por vazio); as seguintes são subidas."""
+    linha = _db().execute("""SELECT SUM(escalonou_por IS NULL) AS cardapios, SUM(custo_usd) AS custo,
+                                    SUM(nivel = 'opus' AND cobrada = 1) AS com_opus
+                             FROM uso_ia WHERE dia >= ? AND tarefa = 'cardapio'""", (desde_dia,)).fetchone()
+    return {"cardapios": linha["cardapios"] or 0, "custo": linha["custo"] or 0.0, "com_opus": linha["com_opus"] or 0}
+
+
 def chamadas_por_tarefa(desde_dia: str) -> list[dict]:
     """Qual modelo fez cada tarefa (para o /custos)."""
     linhas = _db().execute("""SELECT tarefa, nivel, COUNT(*) AS vezes, SUM(custo_usd) AS custo FROM uso_ia

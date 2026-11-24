@@ -52,7 +52,10 @@ PRECOS = {
 }
 ESCRITA_CACHE = 1.25
 
-TAREFAS_ESFORCO_MEDIO = {"troca", "cardapio", "complexo", "otimizar_lista"}  # o resto: "low"
+# Effort "medium" nas tarefas que exigem conta de orçamento; o resto: "low". Na troca, o Haiku
+# também usa "medium" (conferido em 24/11: o Haiku 5.5 aceita low a max e o padrão dele é medium;
+# a troca custa ~US$ 0,001 nele, e nos testes reais ele estourou o orçamento por pouco).
+TAREFAS_ESFORCO_MEDIO = {"troca", "cardapio", "complexo", "otimizar_lista"}
 _CLAUDE = {"haiku": ("CLAUDE_MODELO_BARATO", "claude-haiku-5-5", "LIMITE_HAIKU_DIA", 500),
            "sonnet": ("CLAUDE_MODELO_PADRAO", "claude-sonnet-5-5", "LIMITE_SONNET_DIA", 100),
            "opus": ("CLAUDE_MODELO_FORTE", "claude-opus-5-5", "LIMITE_OPUS_DIA", 20)}
