@@ -1,11 +1,13 @@
 # Contexto do projeto Rende (para retomar o trabalho)
 
-Última atualização: 23/11/2026. Tudo foi feito numa conversa longa com o Claude Code
-(Opus 5.5), com o celular do dono do projeto ligado ao computador por cabo (adb) para os
-testes no Telegram. O texto de cada pedido está em [docs/PEDIDOS.md](docs/PEDIDOS.md).
+Última atualização: 24/11/2026. Os pedidos 0 a G foram feitos em 23/11 numa conversa longa
+com o Claude Code (Opus 5.5), com o celular do dono do projeto ligado ao computador por cabo
+(adb) para os testes no Telegram. Em 24/11 o trabalho foi retomado em outro computador com a
+especificação completa (Pedido H). O texto de cada pedido está em [docs/PEDIDOS.md](docs/PEDIDOS.md).
 
 > **Para retomar com o Claude Code:** peça "leia o CONTEXTO.md, o PLANO.md e o
-> docs/PEDIDOS.md e continue pelos próximos passos". Rode os testes antes de mexer.
+> docs/PEDIDOS.md (Pedido H) e continue pela ordem de trabalho do PLANO.md".
+> Rode os testes antes de mexer.
 
 ---
 
@@ -17,10 +19,14 @@ orçamento, troca de pratos, receita passo a passo com nota, PDF da lista, conve
 por texto, áudio e foto, e uma escada de modelos de IA que sobe de nível só quando precisa.
 
 - Bot: `@cesta_cardapio_bot`. Nasceu como "Cesta" e foi renomeado para "Rende" pela API.
-- Pasta local: `C:\Users\Matheus Duarte\cesta-bot` (ambiente virtual em `.venv`).
+- Pasta local: `C:\Users\mathe\Plano-2-` desde 24/11 (ambiente virtual em `.venv`, Python 3.12).
+  O banco `rende.db` não vem pelo Git: aqui ele começou vazio, e o perfil e os custos do teste
+  de 23/11 ficaram no computador antigo.
 - Por enquanto roda **só no computador local** (polling). Desligou o computador, o bot para.
 
-## 2. Linha do tempo (23/11/2026)
+## 2. Linha do tempo
+
+**23/11/2026**
 
 1. **Bot "Cesta" (pedido 0):** bot criado pelo @BotFather pelo celular via adb. O token foi
    lido da tela por um script que o gravou direto no `.env`, sem nunca aparecer na conversa.
@@ -48,6 +54,16 @@ por texto, áudio e foto, e uma escada de modelos de IA que sobe de nível só q
 6. **Ajustes pedidos depois do teste:** a confirmação de troca virou uma linha no topo da
    tela do dia (sem mensagem extra). O PDF some sozinho depois de `APAGAR_PDF_APOS_MIN`
    minutos (padrão 5), e gerar um novo apaga o anterior. Os dois foram testados no celular.
+
+**24/11/2026**
+
+7. **Retomada (Pedido H, PARTE A):** projeto baixado do GitHub em outro computador, todo o
+   código lido, testes 101 de 101 OK, comparação com a especificação completa (resultado na
+   tabela "situação de cada item" do [PLANO.md](PLANO.md)). Nenhum código foi alterado.
+8. **Incidente de segurança:** o `.env` com as 3 chaves estava no primeiro commit e tinha ido
+   para o GitHub. Com autorização do dono, o commit foi retirado da história e o GitHub foi
+   atualizado (force push protegido); o `.env` local foi mantido. **Pendente: o dono trocar as
+   3 chaves.** Detalhes na seção "Segurança" do PLANO.md.
 
 ## 3. Arquitetura (cada arquivo com um papel)
 
@@ -79,7 +95,7 @@ Tabelas: `usuarios`, `historico` (30 últimas), `planos` (3 últimos; o mais nov
   Gerar cardápio: Sonnet → Opus. Opus só por escalonamento ou caso complexo (3+ restrições,
   ou otimizar promoções de vários mercados). Todos os níveis do Claude falharam → Gemini.
   Pedido complexo vindo da conversa ("pedir_especialista") vai para o Sonnet.
-- **API do Claude:** SDK `anthropic` 2.12, IDs sem data; sem temperature/top_p/top_k/
+- **API do Claude:** SDK `anthropic` 2.13 (instalado em 24/11), IDs sem data; sem temperature/top_p/top_k/
   budget_tokens/thinking; `tool_choice` "auto"; effort explícito ("low" na conversa,
   "medium" em troca e cardápio); `stop_reason` "refusal" sobe de nível; prompt caching nas
   instruções fixas (conferido na API real: 3.699 tokens lidos do cache, custo ~7x menor).
@@ -87,12 +103,13 @@ Tabelas: `usuarios`, `historico` (30 últimas), `planos` (3 últimos; o mais nov
 - **Botões e telas neutras** (`telas.py`) para facilitar um canal futuro (WhatsApp).
 - Receita gerada só quando a pessoa abre o prato (Gemini, barato) e guardada no plano.
 - "Compra do mês" ainda gera plano semanal com orçamento mensal ÷ 4,3.
-- Segredos: `.env` e `rende.db` ficam fora do Git; o log mascara tokens e chaves.
+- Segredos: `.env` e qualquer `*.db` ficam fora do Git (o `.env` chegou a ser enviado por
+  engano e foi retirado da história em 24/11); o log mascara tokens e chaves.
 
 ## 5. Como rodar e testar
 
 Veja o [README](README.md). Testes automáticos: `.venv\Scripts\python testes\testar.py`
-(**101 de 101 OK** em 23/11/2026). Ajudantes do teste pelo celular em `testes/celular/`.
+(**101 de 101 OK** em 24/11/2026). Ajudantes do teste pelo celular em `testes/celular/`.
 
 ## 6. Resultado do teste real no celular (23/11/2026)
 
@@ -120,31 +137,32 @@ Veja o [README](README.md). Testes automáticos: `.venv\Scripts\python testes\te
 
 ## 8. Próximos passos (pendentes)
 
-Em ordem sugerida:
+**Antes de tudo (só o dono):** trocar as 3 chaves e colar as novas no `.env` local.
 
-1. **Melhorar o Haiku nas trocas:** nas 2 trocas reais ele estourou o orçamento e precisou
-   do Sonnet. Passar a ele a folga exata e os itens com sobra na lista para reaproveitar.
-2. **Estimativa de custo:** um plano de 21 refeições gerou 12,4 mil tokens de saída no
-   Sonnet (~US$ 0,13), acima do estimado. Avaliar `effort` "low" ou dividir a geração.
-3. **Pedido A, teste no celular:** foto de geladeira e de nota fiscal (o dono grava/fotografa).
-4. **B2 (entender qualquer mensagem):** foto de **encarte** → extrair ofertas e chamar
-   `salvar_promocoes_de_encarte` (ferramenta ainda não criada). Texto, voz, foto, PDF,
-   localização (só salva) e figurinha já funcionam.
-5. **B4 (mercados próximos):** botão "📍 Enviar minha localização", busca no Overpass
-   (OpenStreetMap) num raio de 3 km, até 8 mercados com distância e link do Google Maps,
-   destacando os que têm promoção. Teste com um ponto público de Goiânia (não o GPS do dono).
-6. **B5 (promoções e avisos):** `/promo` (admin), JobQueue: aviso de promoção nova para quem
-   tem o produto na lista ou nas preferências (máx. 1 por dia), resumo semanal (padrão
-   sábado 9h), `/avisos`, apagar promoções vencidas.
-7. **Teste final no celular dos pedidos B/E** que faltam: áudio pedindo o cardápio, mandar
-   localização, `/promo` e ver o aviso chegar, foto de encarte, `/esquecer`.
-8. **Pedido C (coletor de promoções de Goiânia), Fase 1:** pesquisa das redes (loja em
-   Goiânia, onde ficam os encartes, robots.txt e termos). **Parar e esperar aprovação**
-   antes da Fase 2.
-9. **Colocar no ar 24h** (Railway ou Render, como *Background Worker*; uma só cópia do bot
-   rodando) e **guardar dados no Supabase** (reescrever só o `banco.py`; LGPD: avisar no
-   `/start`, prazo de retenção, `/esquecer` já existe).
-10. Revisar a lista de exceções de alergia com casos reais e o PDF em celulares pequenos.
+A ordem agora é a da PARTE D do Pedido H (lista completa e situação de cada item no
+[PLANO.md](PLANO.md)). As pendências antigas entram assim:
+
+1. **C1, C4–C11 (próximo):** fechar as lacunas de alergia escondida no nome do prato (C10),
+   repetição da semana anterior, "≈ estimado" e "🔥 promoção" no PDF (C11). Foto de
+   **encarte** → extrair ofertas e salvar em `promocoes` com origem "usuario" (C6; a
+   ferramenta `salvar_promocoes_de_encarte` ainda não existe). Revisar as exceções de
+   alergia com casos reais e o PDF em celulares pequenos.
+2. **C2:** melhorar o Haiku nas trocas (nas 2 trocas reais ele estourou o orçamento e
+   precisou do Sonnet: passar a folga exata e as sobras para reaproveitar). Rever o custo
+   do cardápio (21 refeições geraram 12,4 mil tokens de saída no Sonnet, ~US$ 0,13).
+   `/custos` com escalonamentos também no mês.
+3. **C3:** escopo conferido em código (`no_escopo`), com teste de 40 mensagens.
+4. **C13 Fase 1:** pesquisa das redes de Goiânia. **Parar e esperar aprovação.**
+5. **C13 Fase 2 + C14:** coletor das redes aprovadas; `/promo`, `/avisos`, avisos pelo
+   JobQueue (máx. 1 por dia), resumo semanal (padrão sábado 9h), apagar promoções vencidas.
+6. **C15:** "Onde comprar" (total por mercado, 3 melhores, divisão só se economizar R$ 15+).
+7. **C12:** mercados próximos pelo Overpass (OpenStreetMap), raio de 3 km, até 8 mercados.
+   Teste com um ponto público de Goiânia (não o GPS do dono).
+8. **Testes no celular (PARTE E)**, com o custo estimado avisado antes. Inclui o que ficou
+   do Pedido A: foto de geladeira e de nota fiscal.
+9. **Relatório final (PARTE F).** Depois: colocar no ar 24h (Railway ou Render, como
+   *Background Worker*, uma só cópia do bot) e guardar dados no Supabase (reescrever só o
+   `banco.py`; LGPD: avisar no `/start`, prazo de retenção, `/esquecer` já existe).
 
 ## 9. Observações
 
@@ -153,3 +171,4 @@ Em ordem sugerida:
 - Gemini no plano gratuito: o `/custos` mostra preço de tabela, mas o custo real é zero.
 - Preços de tabela usados (US$/1M tokens, entrada/saída): Opus 5.5 4/20, Sonnet 5.5 2/10,
   Haiku 5.5 0,10/0,50, Gemini 3.5 Flash-Lite 0,30/2,50, Gemini 3.6 Flash 0,75/3,75.
+  Conferir na documentação atual antes de usar esses valores em estimativas de custo.

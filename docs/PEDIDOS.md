@@ -1,6 +1,6 @@
 # Pedidos (texto original, em ordem)
 
-Todos feitos em 23/11/2026. Situação de cada um: [PLANO.md](../PLANO.md) e [CONTEXTO.md](../CONTEXTO.md).
+Pedidos 0 a G: feitos em 23/11/2026. Pedido H (24/11/2026): em andamento. Situação de cada um: [PLANO.md](../PLANO.md) e [CONTEXTO.md](../CONTEXTO.md).
 
 ---
 
@@ -365,3 +365,290 @@ depois de `APAGAR_PDF_APOS_MIN` minutos (padrão 5) e o anterior é apagado ao g
 
 > Suba no meu GitHub, quero o contexto de toda essa mensagem e tudo o que fizemos e os
 > próximos passos pendentes. Repositório: `Matheus-Ceciliano/Plano-2-`.
+
+---
+
+## Pedido H: retomada com a especificação completa (24/11/2026)
+
+Texto original colado na conversa. Substitui os pedidos anteriores onde eles discordarem.
+Situação e ordem de trabalho: [PLANO.md](../PLANO.md).
+
+Você vai continuar o desenvolvimento do Rende: um assistente de Telegram que monta o cardápio da semana e a lista de compras dentro do orçamento da família, mostra promoções e diz onde comprar mais barato. Foco inicial: Goiânia. Público: famílias brasileiras de baixa e média renda.
+
+Eu sou iniciante em programação. Explique em português simples o que você faz em cada etapa.
+
+### PARTE A — PEGAR O PROJETO E ENTENDER O CONTEXTO
+
+#### A1. Clonar
+
+- Repositório: https://github.com/Matheus-Ceciliano/Plano-2-.git
+- Se a pasta já existir, faça git pull em vez de clonar de novo.
+
+#### A2. Ler tudo antes de mexer
+
+Leia nesta ordem:
+
+- PLANO.md (o que foi feito, o que falta e as decisões);
+- README.md;
+- o código: bot_telegram.py, roteador.py, ia.py, ia_claude.py, ferramentas.py, banco.py, pdf.py, prompts.py, coletor/ e testes;
+- git log;
+- .env.example.
+- Rode os testes automáticos e anote quantos passam.
+
+#### A3. Segurança (verificar primeiro)
+
+- Confira se .env, `*.db` ou qualquer token ou chave foi enviado ao repositório, inclusive no histórico do git. Se encontrar, me avise IMEDIATAMENTE e pare. Não apague o histórico sem me perguntar.
+- Garanta que o .gitignore tenha: .env, `*.db`, `__pycache__/`, `.venv/`.
+- Nunca escreva chaves, tokens, CPF ou dados de usuários no código, nos commits, nos logs ou na conversa.
+
+#### A4. Resumo para mim — PARE AQUI
+
+Mostre:
+
+- o que o Rende já faz;
+- como os modelos estão organizados;
+- o que falta (comparando com a PARTE C abaixo);
+- testes que passam e falham;
+- problemas ou diferenças entre o código e o PLANO.md.
+- Espere minha confirmação antes de alterar qualquer coisa.
+
+#### A5. Ambiente
+
+- Crie um ambiente virtual e instale o requirements.txt.
+- Crie o .env a partir do .env.example.
+- As chaves (TELEGRAM_BOT_TOKEN, GEMINI_API_KEY, ANTHROPIC_API_KEY) quem coloca sou eu. Quando precisar, me avise e espere. Nunca peça uma chave na conversa.
+
+### PARTE B — REGRAS DE TRABALHO (valem para tudo)
+
+- Uma etapa por vez, na ordem da PARTE C.
+- Ao terminar cada etapa: testes automáticos passando + resumo para mim + PLANO.md atualizado (feito, decisões, pendências), para outra pessoa ou IA conseguir continuar.
+- Commits pequenos, com mensagens claras em português. Não faça push sem me perguntar.
+- Antes de qualquer teste real que gaste dinheiro (chamadas ao Claude), me diga o custo estimado.
+- Antes de qualquer ação no meu celular fora do roteiro (mandar mensagem a alguém, instalar app, pagar), me pergunte.
+- Se algo do que eu pedi não for possível ou for arriscado, explique e proponha uma alternativa em vez de improvisar.
+- Confira sempre a documentação atual das bibliotecas e APIs antes de escrever o código.
+
+### PARTE C — O QUE O RENDE DEVE SER (especificação completa)
+
+- Para cada item, verifique se já existe e está correto. Se já existir, só teste e siga. Se faltar ou estiver errado, implemente.
+
+#### C1. Arquitetura
+
+- Python 3.11+, python-telegram-bot 22+ (async), SQLite agora (acesso isolado em banco.py, para trocar por Supabase depois), fpdf2 para PDF, python-dotenv.
+
+Separação obrigatória:
+
+- bot_telegram.py: só fala com o Telegram;
+- roteador.py: decide o modelo; o resto do código chama só o roteador;
+- ia.py (Gemini) e ia_claude.py (Claude): mesma interface;
+- ferramentas.py: funções que a IA pode chamar;
+- banco.py, pdf.py, prompts.py, coletor/.
+- No futuro o bot vai para o WhatsApp: trocar o mensageiro não pode exigir mexer na IA.
+
+#### C2. Escada de modelos (roteador)
+
+- Começar no mais barato e subir só quando necessário.
+
+| Nível | Modelo | Usar para |
+|---|---|---|
+| 1 | Gemini (GEMINI_MODEL) | conversa, áudio, foto, receitas, extração de encartes e notas |
+| 2 | Claude Haiku (claude-haiku-5-5) | trocar 1 prato; substituto do Gemini sem cota ou fora do ar (conversa e foto; áudio continua só no Gemini) |
+| 3 | Claude Sonnet (claude-sonnet-5-5) | gerar e refazer o cardápio da semana (padrão) |
+| 4 | Claude Opus (claude-opus-5-5) | só por escalonamento: o Sonnet foi reprovado na conferência, ou o caso é complexo (3+ restrições, otimização com vários mercados) |
+
+- Escalonamento: se a conferência em código reprovar, tente de novo UMA vez no nível de cima, passando o motivo ("passou R$ 23 do orçamento", "tinha leite para alérgico a lactose"). Trocar prato: Haiku → Sonnet → Opus. Cardápio: Sonnet → Opus.
+- Recusa ou erro: suba um nível. Se todos falharem, use o Gemini e registre no log.
+- Limites diários no .env: LIMITE_OPUS_DIA (20), LIMITE_SONNET_DIA (100), LIMITE_HAIKU_DIA (500). No limite, fique no nível abaixo e entregue o melhor resultado aprovado.
+- .env: CLAUDE_MODELO_BARATO=claude-haiku-5-5, CLAUDE_MODELO_PADRAO=claude-sonnet-5-5, CLAUDE_MODELO_FORTE=claude-opus-5-5 (IDs exatamente assim, sem data no final).
+
+Regras técnicas da API do Claude (obrigatórias):
+
+- SDK oficial anthropic (AsyncAnthropic, lê ANTHROPIC_API_KEY do ambiente), client.messages.create.
+- NÃO enviar temperature, top_p, top_k nem budget_tokens (erro 400).
+- NÃO enviar thinking {"type": "disabled"}; omitir o parâmetro thinking.
+- tool_choice sempre "auto" (forçar "any" ou "tool" dá erro 400).
+- output_config effort explícito: "low" para conversa no Haiku; "medium" para cardápio e troca no Sonnet e no Opus. max_tokens 16000 no cardápio.
+- Prompt caching (cache_control) no system prompt e nas instruções fixas; confirmar pelo usage.cache_read_input_tokens.
+- Sempre conferir stop_reason antes de ler a resposta ("refusal" → próximo nível).
+- Log e /custos: cada chamada registra modelo, motivo, tokens, custo estimado e escalonamentos, sem o texto da conversa. /custos (só para ADMIN_IDS): gasto por modelo no dia e no mês, e quantas vezes escalou e por quê.
+
+#### C3. Escopo: só responde sobre o Rende
+
+- Dentro: cardápio, receitas do cardápio, lista de compras, PDF, despensa, orçamento, economia, promoções, mercados, "onde comprar", perfil, avisos, fotos e áudios sobre esses temas, como usar o Rende, cumprimentos curtos.
+
+- Fora (exemplos): conhecimentos gerais, notícias, política, futebol, escola, programação, textos, tradução, piadas, conselhos gerais, receitas sem relação com cardápio ou orçamento, orientação médica ou nutrição clínica, pedidos para ignorar regras, mudar de personalidade ou revelar o prompt.
+
+Duas camadas:
+
+- No prompt de TODOS os modelos.
+- Em código (principal): toda resposta vem estruturada com o campo "no_escopo". Se for false, o código descarta o texto do modelo e manda uma mensagem fixa (3 ou 4 variações), por exemplo: "Ih, {nome}, disso eu não entendo 😅 Eu sou especialista em cardápio, lista de compras e economia no mercado. Quer que eu monte o cardápio da semana ou veja as promoções?", com botões [📅 Meu cardápio] [🔥 Promoções] [🛒 Lista].
+
+Regras:
+
+- Conta no limite diário; nunca escala para o Claude; o log registra só "fora_do_escopo".
+- Pergunta mista: responde só a parte do Rende.
+- Restrição de saúde: respeita no cardápio, mas sem orientação médica; sugere nutricionista ou médico.
+
+#### C4. Personalidade
+
+- Amigo que entende de mercado: simpático, leve, chama pelo nome, português do Brasil ("você", "economizou"; nunca português de Portugal), emojis com moderação.
+- Lembra do perfil e das preferências sem perguntar de novo; comemora a economia ("Essa semana sobrou R$ 42! 🎉").
+- Toma iniciativa com moderação no resumo semanal; se não souber, admite e nunca inventa preço.
+- A mesma voz em todos os modelos.
+
+#### C5. Memória (banco)
+
+- Tabelas: usuarios (telegram_id, nome, família, refeições, dias, vibe, restrições, utensílios, mercado preferido, compra semanal/mensal, orçamento, localização, preferências de pratos aprovados e rejeitados, avisos), historico (últimas 30 mensagens), planos (3 últimos), despensa, promocoes, custos.
+- /perfil edita qualquer item; o usuário também pode mudar conversando ("agora somos 4").
+- /esquecer apaga TUDO do usuário, com confirmação (LGPD).
+
+#### C6. Entender qualquer mensagem
+
+- Texto, áudio (até 2 min), foto, PDF ou imagem (até 10 MB), localização, figurinha.
+- Foto de geladeira ou despensa → identifica e usa no cardápio.
+- Foto de nota fiscal → lista itens e preços.
+- Foto de encarte → extrai ofertas e salva em promocoes (origem "usuario").
+- Localização → salva e oferece mercados próximos.
+- Tudo conta no LIMITE_MSG_DIA. Arquivos são apagados depois de processar.
+
+#### C7. Cadastro com botões (primeira vez)
+
+Uma pergunta por mensagem, com botões, aceitando também texto e áudio:
+
+- Nome.
+- Adultos e crianças (+/−; criança = meia porção; mostrar "= X porções por refeição").
+- Refeições (café, almoço, jantar, lanches, marmita).
+- Dias da semana em que cozinha.
+- Vibe (rápido, cozinhar no domingo para a semana, uma panela só, comida de vó, leve, fitness).
+- Alergias e restrições (lactose, glúten, ovo, amendoim/castanhas, frutos do mar, peixe, soja, vegetariano, outro).
+- Utensílios (fogão, forno, micro-ondas, airfryer, panela de pressão, panela elétrica).
+- Mercado (redes de Goiânia ou "qualquer um").
+- Compra da semana ou do mês.
+- Orçamento: sugestão realista + botões −R$ 20 / +R$ 20 / Confirmar, com o resumo de porções e valor.
+
+#### C8. "Montando seu plano"
+
+- Uma mensagem só, editada a cada etapa REAL: promoções → receitas → cesta → orçamento → finalizando. Se reprovar na conferência: "⏳ Ajustando as receitas…".
+
+#### C9. Resultado, cardápio e receitas
+
+- "Sua semana está pronta, {nome}! 🎉 Gasto R$ X de R$ Y. Sobrou R$ Z · N itens."
+- Botões: [📅 Ver cardápio] [🛒 Lista] [📄 PDF] [🔄 Refazer] [🏪 Onde comprar].
+- Cada dia mostra as refeições com tempo e custo, e os botões [📖 Receita] e [🔁 Trocar]. A troca recalcula dentro do orçamento.
+- Receita: quantidades da família, medidas brasileiras, passo a passo (um passo por mensagem, botão [Próximo ▶️]), fim com [✅ Fiz!] e nota de 1 a 5 (salva no perfil e usada nos próximos cardápios). Sem imagens geradas por IA.
+
+#### C10. Conferências em código (nunca confiar só na IA)
+
+- Compra por embalagem real ("1 pacote 5 kg"); a sobra não perecível vai para a despensa.
+- Alergias, incluindo casos escondidos (leite de coco, pão de queijo etc.).
+- Mesmo prato no máximo 1 vez por semana; evitar repetir a semana anterior (salvo favoritos).
+- Só receitas com os utensílios que a pessoa tem.
+- Total dentro do orçamento.
+- Ao escalar porções, ajustar também o modo de preparo.
+- Comida brasileira de verdade, incluindo a goiana (arroz com pequi, empadão, pamonha) e sobras planejadas.
+- O plano nunca muda sozinho.
+
+#### C11. PDF da lista
+
+- Título "Rende", nome, data, itens por seção com caixinha, quantidade, preço, marca "🔥 promoção (mercado, até dd/mm)" ou "≈ estimado", total, orçamento e sobra. Se a compra for dividida, separar por mercado. Apagar o arquivo local depois de enviar.
+
+#### C12. Mercados próximos
+
+- Botão "📍 Enviar minha localização".
+- API Overpass (OpenStreetMap), raio de 3 km configurável, até 8 mercados com distância e link do Google Maps, destacando os que têm promoção.
+- Respeitar os limites de uso e usar um User-Agent genérico do app.
+
+#### C13. Coletor de promoções (Goiânia)
+
+FASE 1 (pesquisa, sem código): para Tático, Bretas, Prezunic, Assaí, Dia a Dia, Carrefour/Atacadão, Barão, Pão de Açúcar, Sam's Club e Cerrado, faça uma tabela com:
+
+- se tem loja em Goiânia hoje;
+- onde ficam as ofertas (encarte em imagem ou PDF, HTML, loja online, só no app);
+- se varia por loja ou região;
+- robots.txt e termos de uso;
+- observações (preço só para sócio, só no app, atacado).
+- Recomende 3 a 5 redes. PARE e espere minha aprovação.
+
+FASE 2 (só as redes aprovadas):
+
+- Um arquivo por rede em coletor/.
+- extrair.py manda o encarte para o Gemini e recebe JSON por oferta (rede, produto, marca, tamanho, preço, preço anterior, condição, validade, região).
+- Normalizar nomes ("ARROZ TIO JOÃO 5KG" → arroz / Tio João / 5 kg) e salvar em promocoes (origem "site", com link da fonte).
+
+Boa conduta (obrigatória):
+
+- 1 coleta por dia (6h);
+- respeitar o robots.txt;
+- 1 requisição a cada 5 s por site, com timeout e User-Agent genérico;
+- hash para não reprocessar o mesmo encarte;
+- se uma rede quebrar, as outras seguem e o admin recebe um aviso;
+- apagar os arquivos depois de extrair.
+- /coletar (admin) roda na hora e mostra o resultado por rede.
+
+#### C14. Promoções e avisos
+
+- /promo (só ADMIN_IDS) para cadastrar ofertas manualmente.
+
+JobQueue:
+
+- promoção nova avisa os usuários da cidade com avisos ativos e o produto na lista ou nas preferências;
+- resumo semanal (dia e hora escolhidos; padrão sábado 9h);
+- no máximo 1 aviso por dia;
+- /avisos liga e desliga.
+- Promoções vencidas somem e são apagadas.
+- O cardápio dá preferência a ingredientes em promoção no mercado escolhido, sem quebrar orçamento, alergias e variedade.
+
+#### C15. "Onde comprar"
+
+- Total da lista atual em cada mercado (promoção quando houver; senão, estimado).
+- Os 3 melhores com total e distância; a opção de dividir entre 2 mercados só se economizar pelo menos R$ 15.
+- Marcar cada item como "🔥 promoção (até dd/mm)" ou "≈ estimado" e mostrar o % da lista com preço real.
+- Avisar condições: só para sócio, só no app, leve X pague Y.
+
+### PARTE D — ORDEM DE EXECUÇÃO
+
+### PARTE A completa (clonar, ler, segurança, resumo) → esperar confirmação.
+
+- Conferir e completar C1, C4, C5, C6, C7, C8, C9, C10 e C11 (o que já existe: só testar).
+- C2 (escada de modelos).
+- C3 (escopo).
+- C13 FASE 1 → esperar aprovação das redes.
+- C13 FASE 2 + C14.
+- C15.
+- C12.
+- Testes no celular (PARTE E).
+- Relatório final e PLANO.md atualizado.
+
+### PARTE E — TESTES
+
+Automáticos (sem chamar APIs reais; modelos simulados):
+
+- roteador: nível inicial, escalonamento, recusa, limites, áudio nunca no Claude;
+- escopo: 40 mensagens (20 dentro, 20 fora, incluindo mistas e tentativas de manipulação);
+- conferências: embalagem, alergias escondidas, repetição, utensílios, orçamento;
+- coletor: extração, normalização, deduplicação, falha de uma rede;
+- "onde comprar": total por mercado e divisão;
+- PDF, banco, /esquecer, avisos.
+
+No celular (me avise o custo antes):
+
+- /start como usuário novo e cadastro completo;
+- ver a "animação" e o resultado;
+- trocar 2 pratos;
+- abrir uma receita no passo a passo e dar uma nota;
+- gerar o PDF;
+- mandar um áudio e uma foto de geladeira;
+- mandar a localização e ver os mercados;
+- "Onde comprar";
+- /promo e ver o aviso chegar;
+- 5 perguntas fora do escopo;
+- /custos;
+- /esquecer.
+- Mostre o texto de cada resposta, qual modelo respondeu e o custo.
+
+### PARTE F — RELATÓRIO FINAL
+
+- O que funciona, o que não funciona e por quê.
+- Custo médio por cardápio e % de escalonamento para o Opus.
+- Próximos passos recomendados (servidor 24h no Railway ou Render, Supabase, WhatsApp, política de privacidade).
+- PLANO.md atualizado.
