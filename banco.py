@@ -69,7 +69,7 @@ CREATE TABLE IF NOT EXISTS promocoes (
     preco           REAL NOT NULL,
     validade        TEXT NOT NULL, -- AAAA-MM-DD (último dia da oferta)
     cidade          TEXT,
-    origem          TEXT NOT NULL, -- 'admin', 'encarte' ou 'site'
+    origem          TEXT NOT NULL, -- 'admin' (/promo), 'usuario' (encarte mandado pela pessoa) ou 'site' (coletor)
     marca           TEXT,
     tamanho         TEXT,
     preco_anterior  REAL,

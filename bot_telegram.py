@@ -324,6 +324,17 @@ async def mensagem_de_voz(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
                            tamanho=voz.file_size, duracao=_segundos(voz.duration))
 
 
+async def arquivo_de_audio(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Áudio mandado como arquivo (mp3, m4a...), não como mensagem de voz (C6). Como documento,
+    o Telegram não informa a duração: vale o limite de tamanho (10 MB)."""
+    mensagem = update.effective_message
+    audio = mensagem.audio or mensagem.document
+    duracao = _segundos(getattr(audio, "duration", 0))
+    await _receber_arquivo(update, context, file_id=audio.file_id, tipo="audio",
+                           mime_type=atendimento.mime_de_audio(audio.mime_type), tamanho=audio.file_size,
+                           duracao=duracao)
+
+
 async def foto(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     maior = update.effective_message.photo[-1]  # o último tamanho é o maior
     await _receber_arquivo(update, context, file_id=maior.file_id, tipo="imagem", mime_type="image/jpeg",
@@ -391,6 +402,7 @@ def main() -> None:
     app.add_handler(CallbackQueryHandler(botao))
     app.add_handler(MessageHandler(filters.TEXT, mensagem_de_texto))
     app.add_handler(MessageHandler(filters.VOICE, mensagem_de_voz))
+    app.add_handler(MessageHandler(filters.AUDIO | filters.Document.AUDIO, arquivo_de_audio))
     app.add_handler(MessageHandler(filters.PHOTO, foto))
     app.add_handler(MessageHandler(filters.Document.PDF | filters.Document.IMAGE, documento))
     app.add_handler(MessageHandler(filters.LOCATION, localizacao))

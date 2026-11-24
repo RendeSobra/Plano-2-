@@ -818,6 +818,66 @@ ok(len(leitor_g.pages) >= 2 and len(rects) == 70 and all(r[1] > 30 and r[3] < 84
    f"lista grande: {len(leitor_g.pages)} páginas, cada caixinha dentro da página do seu item")
 
 # =======================================================================================
+secao("C6: encarte, arquivo de áudio")
+from datetime import timedelta  # noqa: E402
+
+novo_banco()
+gemini, claude = instalar_ias()
+criar_usuario("e1")
+amanha = (banco.agora().date() + timedelta(days=1)).isoformat()
+ofertas = [{"produto": "arroz", "marca": "Tio João", "tamanho": "5 kg", "preco": 21.9, "preco_anterior": 27.9},
+           {"produto": "feijão carioca", "tamanho": "1 kg", "preco": 6.49, "condicao": "leve 3 pague 2"},
+           {"produto": "", "preco": 5}, {"produto": "óleo", "preco": 0}, {"produto": "carne", "preco": 99999}]
+r_e = asyncio.run(ferramentas.executar(Chamada("e1", "salvar_promocoes_de_encarte",
+                                               {"mercado": "Tático", "validade": amanha, "ofertas": ofertas}),
+                                       ferramentas.Contexto(usuario="e1")))
+promos_e = banco.promocoes_validas(cidade="Goiânia", mercado="Tático")
+ok(r_e["salvas"] == 2 and r_e["ignoradas"] == 3 and {p["origem"] for p in promos_e} == {"usuario"}
+   and promos_e[0]["validade"] == amanha,
+   "encarte: ofertas legíveis salvas em promocoes (origem 'usuario'); sem nome, preço zero ou absurdo são ignorados")
+arroz_e = next(p for p in promos_e if p["produto"] == "arroz")
+feijao_e = next(p for p in promos_e if p["produto"] == "feijão carioca")
+ok(arroz_e["marca"] == "Tio João" and arroz_e["preco_anterior"] == 27.9 and feijao_e["condicao"] == "leve 3 pague 2",
+   "marca, preço anterior e condição ('leve 3 pague 2') são guardados")
+r_e2 = asyncio.run(ferramentas.executar(Chamada("e2", "salvar_promocoes_de_encarte",
+                                                {"mercado": "tático", "validade": amanha, "ofertas": ofertas[:2]}),
+                                        ferramentas.Contexto(usuario="e1")))
+ok(r_e2["salvas"] == 0 and len(banco.promocoes_validas(mercado="Tático")) == 2, "o mesmo encarte mandado de novo não duplica")
+r_e3 = asyncio.run(ferramentas.executar(Chamada("e3", "salvar_promocoes_de_encarte",
+                                                {"mercado": "Bretas", "ofertas": [{"produto": "café", "preco": 15.9}]}),
+                                        ferramentas.Contexto(usuario="e1")))
+ok(r_e3["salvas"] == 1 and r_e3["validade"] == (banco.agora().date() + timedelta(days=6)).isoformat() and "aviso" in r_e3,
+   "encarte sem validade impressa vale 6 dias, com aviso")
+r_e4 = asyncio.run(ferramentas.executar(Chamada("e4", "salvar_promocoes_de_encarte",
+                                                {"mercado": "Barão", "validade": "2020-01-01",
+                                                 "ofertas": [{"produto": "café", "preco": 15.9}]}),
+                                        ferramentas.Contexto(usuario="e1")))
+ok("erro" in r_e4 and not banco.promocoes_validas(mercado="Barão"), "encarte vencido não é salvo")
+gemini.fila = [RespostaIA(chamadas=[Chamada("c9", "salvar_promocoes_de_encarte",
+                                            {"mercado": "Assaí", "validade": amanha,
+                                             "ofertas": [{"produto": "frango", "tamanho": "1 kg", "preco": 11.9}]})]),
+               "🔥 Salvei 1 oferta do Assaí"]
+foto_encarte = {"tipo": "imagem", "mime_type": "image/jpeg", "dados": b"jpg"}
+s = asyncio.run(atendimento.responder("e1", "", anexo=foto_encarte))
+ok(s[0].texto.startswith("🔥 Salvei") and banco.promocoes_validas(mercado="Assaí")[0]["produto"] == "frango"
+   and gemini.chamadas[0]["mensagens"][-1]["anexo"]["mime_type"] == "image/jpeg"
+   and any(d["nome"] == "salvar_promocoes_de_encarte" for d in gemini.chamadas[0]["ferramentas"]),
+   "foto de encarte na conversa: o Gemini lê e a ferramenta salva as ofertas")
+ok("Encarte" in cardapio.prompts.CONVERSA and "salvar_promocoes_de_encarte" in cardapio.prompts.CONVERSA,
+   "as instruções da conversa explicam o que fazer com encarte")
+ok(atendimento.mime_de_audio("audio/x-m4a") == "audio/mp4" and atendimento.mime_de_audio("audio/mpeg") == "audio/mpeg"
+   and atendimento.mime_de_audio(None) == "audio/ogg", "arquivo de áudio: tipos ajustados para o Gemini (m4a -> mp4)")
+claude.chamadas.clear()
+gemini.chamadas.clear()
+gemini.fila = ["🎤 Entendi: R$ 300 por semana"]
+s = asyncio.run(atendimento.responder("e1", "", anexo={"tipo": "audio", "mime_type": "audio/mpeg", "dados": b"ID3"}))
+ok(s[0].texto.startswith("🎤") and gemini.chamadas and not claude.chamadas,
+   "arquivo de áudio (mp3) é entendido pelo Gemini e nunca vai para o Claude")
+codigo_bot = (RAIZ / "bot_telegram.py").read_text(encoding="utf-8")
+ok("filters.AUDIO | filters.Document.AUDIO, arquivo_de_audio" in codigo_bot,
+   "o bot aceita áudio mandado como arquivo, além da mensagem de voz")
+
+# =======================================================================================
 secao("Cadastro com botões")
 novo_banco()
 banco.obter_ou_criar_usuario("c1")

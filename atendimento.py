@@ -36,6 +36,19 @@ _travas: dict[str, asyncio.Lock] = defaultdict(asyncio.Lock)  # uma coisa por ve
 _versoes: dict[str, int] = defaultdict(int)  # muda no /novo e /esquecer: respostas atrasadas são descartadas
 
 
+# Tipos de áudio que o Gemini aceita; o Telegram às vezes manda nomes alternativos
+_MIME_AUDIO = {"audio/x-m4a": "audio/mp4", "audio/m4a": "audio/mp4", "audio/x-wav": "audio/wav",
+               "audio/wave": "audio/wav", "audio/mp3": "audio/mpeg", "audio/opus": "audio/ogg",
+               "audio/x-flac": "audio/flac", "audio/x-aac": "audio/aac"}
+
+
+def mime_de_audio(mime: str | None) -> str:
+    mime = (mime or "").lower().split(";")[0].strip()
+    if not mime.startswith("audio/"):
+        return "audio/ogg"
+    return _MIME_AUDIO.get(mime, mime)
+
+
 # --- limites -----------------------------------------------------------------------
 def _limite_dia() -> int:
     return int(os.getenv("LIMITE_MSG_DIA") or 30)

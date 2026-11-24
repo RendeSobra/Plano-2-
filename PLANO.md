@@ -11,7 +11,7 @@ O **Pedido I** (mesmo arquivo) manda executar os itens pendentes do H numa ordem
 com decisões do dono que valem por cima do H (ver "Decisões do Pedido I").
 Histórico, testes reais e detalhes: [CONTEXTO.md](CONTEXTO.md).
 
-Testes automáticos: `.venv\Scripts\python testes\testar.py` (**172 de 172 OK em 24/11/2026**).
+Testes automáticos: `.venv\Scripts\python testes\testar.py` (**182 de 182 OK em 24/11/2026**).
 
 ## Pedidos e situação
 
@@ -26,7 +26,7 @@ Testes automáticos: `.venv\Scripts\python testes\testar.py` (**172 de 172 OK em
 | F | Escada de modelos: Gemini → Haiku → Sonnet → Opus, limites por modelo, cache, /custos | ✅ Feito e testado no celular (23/11) |
 | G | Mensagens de troca e PDF sem poluir o chat; contexto no GitHub | ✅ Feito |
 | H | Retomada com a especificação completa (PARTES A a F) | 🔧 PARTE A ✅ (24/11). Itens pendentes: ver Pedido I |
-| I | Executar os pendentes do H sem parar entre etapas + Modo mercado + PDF com caixinhas | 🔧 Custo do cardápio ✅ · C10 ✅ · C9, C11 e Modo mercado ✅ (24/11). Próximo: C6 |
+| I | Executar os pendentes do H sem parar entre etapas + Modo mercado + PDF com caixinhas | 🔧 Custo do cardápio ✅ · C10 ✅ · C9, C11 e Modo mercado ✅ · C6 ✅ (24/11). Próximo: C2 |
 
 ## Pedido H: situação de cada item da PARTE C (conferido em 24/11/2026)
 
@@ -37,7 +37,7 @@ Testes automáticos: `.venv\Scripts\python testes\testar.py` (**172 de 172 OK em
 | C3 Escopo | ❌ | Hoje é só uma frase no prompt. Falta o campo `no_escopo` conferido em código, as mensagens fixas com botões, o log "fora_do_escopo" e o teste com 40 mensagens |
 | C4 Personalidade | ✅ | O resumo semanal depende do C14 |
 | C5 Memória | ✅ | Funciona com nomes diferentes do pedido: despensa é uma coluna de `usuarios` e os custos ficam em `uso_ia`. `/perfil` não edita cidade nem localização |
-| C6 Entender qualquer mensagem | 🟡 | Foto de encarte não salva as ofertas (origem "usuario"). Localização só é guardada. Arquivo de áudio (que não seja mensagem de voz) não é aceito |
+| C6 Entender qualquer mensagem | ✅ (24/11) | Foto ou PDF de encarte: a ferramenta `salvar_promocoes_de_encarte` salva as ofertas em `promocoes` (origem "usuario"), conferindo preço, validade (sem data impressa: 6 dias; vencida: nada) e repetição. Arquivo de áudio (mp3, m4a...) aceito como a mensagem de voz (só Gemini; como documento, o Telegram não dá a duração e vale o limite de 10 MB). A oferta de mercados próximos ao receber a localização entra com o C12 |
 | C7 Cadastro | ✅ | — |
 | C8 "Montando seu plano" | ✅ | — |
 | C9 Resultado | ✅ (24/11) | Texto e botões como no pedido ([📅 Ver cardápio] [🛒 Lista] [📄 PDF] [🔄 Refazer]) + [🛒 Modo mercado]. Falta só o [🏪 Onde comprar], que entra com o C15 |
@@ -56,8 +56,8 @@ Sem parar entre os itens; resumo curto ao fim de cada C.
 2. ✅ **Custo do cardápio** (24/11): JSON compacto sem modo de preparo; medição antes/depois.
 3. ✅ C10 (conferências), incluindo a lacuna 3 (plano acima do orçamento) (24/11).
 4. ✅ C9, C11 e **Modo mercado** (marcar o que já foi comprado; PDF com caixinhas clicáveis).
-5. ⏳ **Próximo:** C6 (entender qualquer mensagem).
-6. C2 (escada de modelos).
+5. ✅ C6 (entender qualquer mensagem) (24/11).
+6. ⏳ **Próximo:** C2 (escada de modelos).
 7. C3 (escopo).
 8. C13 Fases 1 e 2 (o Claude escolhe as redes pelos critérios do dono; não para).
 9. C14 → C15 → C12.

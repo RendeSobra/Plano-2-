@@ -7,6 +7,7 @@ que o canal executa depois de mandar a resposta da IA.
 """
 import logging
 from dataclasses import dataclass, field
+from datetime import date, timedelta
 
 import banco
 import cardapio
@@ -75,6 +76,20 @@ DEFINICOES = [
      "descricao": "Lista promoções cadastradas e válidas (mercado, produto, preço e validade).",
      "parametros": {"type": "object", "properties": {
          "produto": {"type": "string"}, "mercado": {"type": "string"}, "cidade": {"type": "string"}}}},
+    {"nome": "salvar_promocoes_de_encarte",
+     "descricao": "Salva as ofertas lidas numa foto ou PDF de encarte (folheto de ofertas de um mercado). "
+                  "Mande TODAS as ofertas legíveis; nunca invente preço que não dá para ler.",
+     "parametros": {"type": "object", "required": ["mercado", "ofertas"], "properties": {
+         "mercado": {"type": "string", "description": "Rede do encarte (ex.: 'Tático', 'Assaí')"},
+         "validade": {"type": "string", "description": "Último dia das ofertas, AAAA-MM-DD ('' se não aparece)"},
+         "ofertas": {"type": "array", "items": {"type": "object", "required": ["produto", "preco"], "properties": {
+             "produto": {"type": "string", "description": "O que é, curto: 'arroz', 'feijão carioca'"},
+             "marca": {"type": "string"},
+             "tamanho": {"type": "string", "description": "Embalagem: '5 kg', '900 ml', 'bandeja 30 un'"},
+             "preco": {"type": "number", "description": "Preço da oferta, em reais"},
+             "preco_anterior": {"type": "number", "description": "Preço 'de', se aparecer"},
+             "condicao": {"type": "string", "description": "Ex.: 'leve 3 pague 2', 'só no app', 'cartão da loja'"},
+         }}}}}},
     {"nome": "configurar_avisos",
      "descricao": "Liga ou desliga os avisos de promoção e muda o dia/horário do resumo semanal.",
      "parametros": {"type": "object", "required": ["ativo"], "properties": {
@@ -178,6 +193,54 @@ def _listar_promocoes(ctx: Contexto, produto: str = "", mercado: str = "", cidad
             else "Não há promoção cadastrada para isso agora."}
 
 
+MAX_OFERTAS_ENCARTE = 80
+DIAS_SEM_VALIDADE = 6  # encarte sem data impressa: vale até daqui a 6 dias (uma semana contando hoje)
+
+
+def _salvar_promocoes_de_encarte(ctx: Contexto, mercado: str, ofertas: list, validade: str = "") -> dict:
+    """C6: oferta lida de um encarte vai para `promocoes` com origem 'usuario'. Conferência em código:
+    preço plausível, validade (vencida é ignorada; sem data, vale 6 dias) e sem repetir a mesma oferta."""
+    mercado = (mercado or "").strip()[:60]
+    if not mercado:
+        return {"erro": "diga de qual mercado é o encarte"}
+    hoje = banco.agora().date()
+    aviso = ""
+    try:
+        fim = date.fromisoformat((validade or "").strip()[:10])
+    except ValueError:
+        fim = hoje + timedelta(days=DIAS_SEM_VALIDADE)
+        aviso = f"o encarte não mostra a validade: guardei até {fim.strftime('%d/%m')}"
+    if fim < hoje:
+        return {"erro": f"essas ofertas já venceram ({fim.strftime('%d/%m')}); nada foi salvo"}
+    perfil = banco.usuario(ctx.usuario) or {}
+    cidade = perfil.get("cidade") or "Goiânia"
+    existentes = {(chave(p["mercado"]), chave(p["produto"]), chave(p.get("tamanho") or ""), round(p["preco"], 2))
+                  for p in banco.promocoes_validas(cidade=cidade, mercado=mercado, limite=500)}
+    salvas, ignoradas = [], 0
+    for oferta in (ofertas or [])[:MAX_OFERTAS_ENCARTE]:
+        produto = str(oferta.get("produto") or "").strip()[:80]
+        try:
+            preco = round(float(oferta.get("preco") or 0), 2)
+        except (TypeError, ValueError):
+            preco = 0
+        tamanho = str(oferta.get("tamanho") or "").strip()[:40]
+        assinatura = (chave(mercado), chave(produto), chave(tamanho), preco)
+        if not produto or not 0 < preco < 5000 or assinatura in existentes:
+            ignoradas += 1
+            continue
+        existentes.add(assinatura)
+        anterior = oferta.get("preco_anterior")
+        banco.adicionar_promocao(mercado=mercado, produto=produto, preco=preco, validade=fim.isoformat(),
+                                 cidade=cidade, origem="usuario", marca=str(oferta.get("marca") or "")[:60] or None,
+                                 tamanho=tamanho or None, condicao=str(oferta.get("condicao") or "")[:80] or None,
+                                 preco_anterior=float(anterior) if isinstance(anterior, (int, float)) and anterior > preco
+                                 else None)
+        salvas.append(produto)
+    log.info("Encarte: %d ofertas salvas, %d ignoradas.", len(salvas), ignoradas)
+    return {"ok": True, "salvas": len(salvas), "ignoradas": ignoradas, "mercado": mercado,
+            "validade": fim.isoformat(), **({"aviso": aviso} if aviso else {})}
+
+
 def _configurar_avisos(ctx: Contexto, ativo: bool, dia_semana: str = "", horario: str = "") -> dict:
     campos: dict = {"avisos_ativos": int(bool(ativo))}
     if dia_semana in _NOMES_DIA_SEMANA:
@@ -198,6 +261,7 @@ _IMPLEMENTACOES = {
     "salvar_perfil": _salvar_perfil, "montar_plano": _montar_plano, "trocar_prato": _trocar_prato,
     "mostrar": _mostrar, "avaliar_prato": _avaliar_prato, "listar_promocoes": _listar_promocoes,
     "configurar_avisos": _configurar_avisos, "pedir_especialista": _pedir_especialista,
+    "salvar_promocoes_de_encarte": _salvar_promocoes_de_encarte,
 }
 
 
