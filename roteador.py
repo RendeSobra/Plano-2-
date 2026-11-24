@@ -2,7 +2,8 @@
 quando é preciso. O resto do código chama só este arquivo.
 
 Níveis (do mais barato ao mais caro):
-  1. Gemini (principal e reserva): conversa, áudio, foto, receitas, encartes.
+  1. Gemini (principal e reserva): conversa, áudio, foto, receitas, encartes
+     (o coletor diário de encartes usa SÓ o Gemini).
   2. Claude Haiku: trocar 1 prato; substituto do Gemini sem cota/fora do ar
      (conversa e foto; áudio fica só no Gemini); tarefas curtas e estruturadas.
   3. Claude Sonnet: gerar e refazer o cardápio da semana.
@@ -115,6 +116,8 @@ def escada(tarefa: str, *, complexo: bool = False, tem_audio: bool = False) -> l
         niveis = [claude("opus")] if complexo else [claude("sonnet"), claude("opus")]
     elif tarefa in ("complexo", "otimizar_lista"):
         niveis = [claude("sonnet"), claude("opus")]
+    elif tarefa == "coletor":  # robô diário: só o Gemini (nunca gasta o Claude pago)
+        niveis = niveis_gemini()
     else:  # conversa, midia, cadastro, receita, encarte...
         niveis = niveis_gemini() + [claude("haiku")]
     if tem_audio:  # o Claude não ouve áudio

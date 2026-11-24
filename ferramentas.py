@@ -7,10 +7,10 @@ que o canal executa depois de mandar a resposta da IA.
 """
 import logging
 from dataclasses import dataclass, field
-from datetime import date, timedelta
 
 import banco
 import cardapio
+import promocoes
 from cardapio import DIAS, MERCADOS, REFEICOES, UTENSILIOS, VIBES
 from cesta import chave
 from ia_comum import Chamada
@@ -63,10 +63,11 @@ DEFINICOES = [
          "dia": {"type": "string", "enum": _DIAS}, "refeicao": {"type": "string", "enum": _TIPOS},
          "pedido": {"type": "string", "description": "O que a pessoa quer no lugar (ex.: 'algo sem carne')"}}}},
     {"nome": "mostrar",
-     "descricao": "Mostra o resumo do plano, o cardápio (de um dia), a lista de compras, o PDF da lista ou o "
-                  "Modo mercado (marcar o que já foi para o carrinho, durante as compras).",
+     "descricao": "Mostra o resumo do plano, o cardápio (de um dia), a lista de compras, o PDF da lista, o "
+                  "Modo mercado (marcar o que já foi para o carrinho, durante as compras) ou onde comprar "
+                  "(quanto a lista sai em cada mercado).",
      "parametros": {"type": "object", "required": ["o_que"], "properties": {
-         "o_que": {"type": "string", "enum": ["resumo", "cardapio", "lista", "pdf", "mercado"]},
+         "o_que": {"type": "string", "enum": ["resumo", "cardapio", "lista", "pdf", "mercado", "onde_comprar"]},
          "dia": {"type": "string", "enum": _DIAS}}}},
     {"nome": "avaliar_prato",
      "descricao": "Guarda a nota (1 a 5) que a pessoa deu para um prato. 4-5 = favorito, 1-2 = não usar mais.",
@@ -174,7 +175,7 @@ def _trocar_prato(ctx: Contexto, dia: str, refeicao: str, pedido: str = "") -> d
 def _mostrar(ctx: Contexto, o_que: str, dia: str | None = None) -> dict:
     if not banco.plano_atual(ctx.usuario):
         return {"erro": "a pessoa ainda não tem plano; ofereça montar um"}
-    acao = {"resumo": "pl:res", "lista": "pl:lista", "pdf": "pl:pdf", "mercado": "mm:ver",
+    acao = {"resumo": "pl:res", "lista": "pl:lista", "pdf": "pl:pdf", "mercado": "mm:ver", "onde_comprar": "oc:ver",
             "cardapio": f"pl:dia:{dia}" if dia else "pl:dia"}[o_que]
     ctx.saidas.append(Saida(tipo="acao", acao=acao))
     return {"ok": True}
@@ -196,51 +197,16 @@ def _listar_promocoes(ctx: Contexto, produto: str = "", mercado: str = "", cidad
 
 
 MAX_OFERTAS_ENCARTE = 80
-DIAS_SEM_VALIDADE = 6  # encarte sem data impressa: vale até daqui a 6 dias (uma semana contando hoje)
 
 
 def _salvar_promocoes_de_encarte(ctx: Contexto, mercado: str, ofertas: list, validade: str = "") -> dict:
-    """C6: oferta lida de um encarte vai para `promocoes` com origem 'usuario'. Conferência em código:
-    preço plausível, validade (vencida é ignorada; sem data, vale 6 dias) e sem repetir a mesma oferta."""
-    mercado = (mercado or "").strip()[:60]
-    if not mercado:
-        return {"erro": "diga de qual mercado é o encarte"}
-    hoje = banco.agora().date()
-    aviso = ""
-    try:
-        fim = date.fromisoformat((validade or "").strip()[:10])
-    except ValueError:
-        fim = hoje + timedelta(days=DIAS_SEM_VALIDADE)
-        aviso = f"o encarte não mostra a validade: guardei até {fim.strftime('%d/%m')}"
-    if fim < hoje:
-        return {"erro": f"essas ofertas já venceram ({fim.strftime('%d/%m')}); nada foi salvo"}
+    """C6: oferta lida de um encarte vai para `promocoes` com origem 'usuario' (conferências em promocoes.py)."""
     perfil = banco.usuario(ctx.usuario) or {}
-    cidade = perfil.get("cidade") or "Goiânia"
-    existentes = {(chave(p["mercado"]), chave(p["produto"]), chave(p.get("tamanho") or ""), round(p["preco"], 2))
-                  for p in banco.promocoes_validas(cidade=cidade, mercado=mercado, limite=500)}
-    salvas, ignoradas = [], 0
-    for oferta in (ofertas or [])[:MAX_OFERTAS_ENCARTE]:
-        produto = str(oferta.get("produto") or "").strip()[:80]
-        try:
-            preco = round(float(oferta.get("preco") or 0), 2)
-        except (TypeError, ValueError):
-            preco = 0
-        tamanho = str(oferta.get("tamanho") or "").strip()[:40]
-        assinatura = (chave(mercado), chave(produto), chave(tamanho), preco)
-        if not produto or not 0 < preco < 5000 or assinatura in existentes:
-            ignoradas += 1
-            continue
-        existentes.add(assinatura)
-        anterior = oferta.get("preco_anterior")
-        banco.adicionar_promocao(mercado=mercado, produto=produto, preco=preco, validade=fim.isoformat(),
-                                 cidade=cidade, origem="usuario", marca=str(oferta.get("marca") or "")[:60] or None,
-                                 tamanho=tamanho or None, condicao=str(oferta.get("condicao") or "")[:80] or None,
-                                 preco_anterior=float(anterior) if isinstance(anterior, (int, float)) and anterior > preco
-                                 else None)
-        salvas.append(produto)
-    log.info("Encarte: %d ofertas salvas, %d ignoradas.", len(salvas), ignoradas)
-    return {"ok": True, "salvas": len(salvas), "ignoradas": ignoradas, "mercado": mercado,
-            "validade": fim.isoformat(), **({"aviso": aviso} if aviso else {})}
+    resultado = promocoes.salvar_ofertas(mercado=mercado, ofertas=ofertas, origem="usuario",
+                                         cidade=perfil.get("cidade"), validade=validade or None,
+                                         maximo=MAX_OFERTAS_ENCARTE)
+    resultado.pop("ids", None)
+    return resultado
 
 
 def _configurar_avisos(ctx: Contexto, ativo: bool, dia_semana: str = "", horario: str = "") -> dict:

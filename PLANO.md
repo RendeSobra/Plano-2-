@@ -11,7 +11,7 @@ O **Pedido I** (mesmo arquivo) manda executar os itens pendentes do H numa ordem
 com decisões do dono que valem por cima do H (ver "Decisões do Pedido I").
 Histórico, testes reais e detalhes: [CONTEXTO.md](CONTEXTO.md).
 
-Testes automáticos: `.venv\Scripts\python testes\testar.py` (**197 de 197 OK em 24/11/2026**).
+Testes automáticos: `.venv\Scripts\python testes\testar.py` (**260 de 260 OK em 24/11/2026**).
 
 ## Pedidos e situação
 
@@ -26,13 +26,13 @@ Testes automáticos: `.venv\Scripts\python testes\testar.py` (**197 de 197 OK em
 | F | Escada de modelos: Gemini → Haiku → Sonnet → Opus, limites por modelo, cache, /custos | ✅ Feito e testado no celular (23/11) |
 | G | Mensagens de troca e PDF sem poluir o chat; contexto no GitHub | ✅ Feito |
 | H | Retomada com a especificação completa (PARTES A a F) | 🔧 PARTE A ✅ (24/11). Itens pendentes: ver Pedido I |
-| I | Executar os pendentes do H sem parar entre etapas + Modo mercado + PDF com caixinhas | 🔧 Custo do cardápio ✅ · C10 ✅ · C9, C11 e Modo mercado ✅ · C6 ✅ · C2 ✅ · C3 ✅ (24/11). Próximo: C13 |
+| I | Executar os pendentes do H sem parar entre etapas + Modo mercado + PDF com caixinhas | 🔧 Custo do cardápio ✅ · C10 ✅ · C9, C11 e Modo mercado ✅ · C6 ✅ · C2 ✅ · C3 ✅ · C13 ✅ · C14 ✅ · C15 ✅ (24/11). Próximo: C12 |
 
 ## Pedido H: situação de cada item da PARTE C (conferido em 24/11/2026)
 
 | Item | Situação | O que falta |
 |---|---|---|
-| C1 Arquitetura | 🟡 | Só a pasta `coletor/` (vem no C13) |
+| C1 Arquitetura | ✅ (24/11) | Pasta `coletor/` criada no C13 |
 | C2 Escada de modelos | ✅ (24/11) | `/custos` mostra as subidas de nível do dia e do mês, o custo médio por cardápio e em quantos o Opus entrou. Haiku na troca com effort "medium" (conferido: o Haiku 5.5 aceita low a max e o padrão dele é medium; a troca custa ~US$ 0,001 e exige conta de orçamento). Limite de saída de 32 mil tokens com streaming (decisão de 24/11). Cardápio compacto e Sonnet em effort "low" (Pedido I): ver "Custo do cardápio" |
 | C3 Escopo | ✅ (24/11) | `escopo.py`, três camadas: (1) filtro em código antes de qualquer IA para o que é claramente de fora e não tem nenhuma palavra do Rende (custo zero); (2) toda resposta final começa com a linha "no_escopo: sim/nao" (linha de texto, não JSON forçado, para funcionar igual no Gemini e no Claude com ferramentas); com "nao" o código descarta o texto e manda 1 de 4 mensagens fixas com [📅 Meu cardápio] [🔥 Promoções] [🛒 Lista]; (3) o especialista (Claude) exige no_escopo = true. Conta no limite diário, não entra no histórico e o log diz só "fora_do_escopo". Teste com 40 mensagens: o filtro pega 17 de 20 de fora (todas as de manipulação) e não barra nenhuma de dentro nem as mistas. Sem o campo, a resposta é tratada como dentro (fica um aviso no log). Tela [🔥 Promoções] simples já existe (C14 completa) |
 | C4 Personalidade | ✅ | O resumo semanal depende do C14 |
@@ -40,13 +40,13 @@ Testes automáticos: `.venv\Scripts\python testes\testar.py` (**197 de 197 OK em
 | C6 Entender qualquer mensagem | ✅ (24/11) | Foto ou PDF de encarte: a ferramenta `salvar_promocoes_de_encarte` salva as ofertas em `promocoes` (origem "usuario"), conferindo preço, validade (sem data impressa: 6 dias; vencida: nada) e repetição. Arquivo de áudio (mp3, m4a...) aceito como a mensagem de voz (só Gemini; como documento, o Telegram não dá a duração e vale o limite de 10 MB). A oferta de mercados próximos ao receber a localização entra com o C12 |
 | C7 Cadastro | ✅ | — |
 | C8 "Montando seu plano" | ✅ | — |
-| C9 Resultado | ✅ (24/11) | Texto e botões como no pedido ([📅 Ver cardápio] [🛒 Lista] [📄 PDF] [🔄 Refazer]) + [🛒 Modo mercado]. Falta só o [🏪 Onde comprar], que entra com o C15 |
+| C9 Resultado | ✅ (24/11) | Texto e botões como no pedido ([📅 Ver cardápio] [🛒 Lista] [📄 PDF] [🔄 Refazer] [🏪 Onde comprar]) + [🛒 Modo mercado] |
 | C10 Conferências em código | ✅ (24/11) | Feito no Pedido I: pratos que costumam levar o ingrediente proibido são barrados pelo nome (purê, strogonoff, empadão, lasanha, escondidinho, pamonha, feijoada, galinhada, vatapá...), salvo a versão segura escrita no nome ("sem lactose", "vegetariano"); 2 ou mais pratos repetidos da semana passada (fora favoritos) fazem refazer, 1 é só aviso; plano acima do orçamento é entregue com o aviso e os botões [Tirar lanches] [Aumentar para R$ X] [Pratos mais simples], e o cadastro avisa quando o orçamento fica abaixo de 75% da sugestão; a receita guarda as porções e é refeita na nova proporção se a família mudar (a lista não muda sozinha). Alergia no registro é reconhecida pelo rótulo "(Lactose)", não pela palavra solta |
-| C11 PDF | ✅ (24/11) | Cada item com "≈ estimado", "PROMOÇÃO (mercado, até dd/mm)" ou "preço pago" (Modo mercado); caixinhas clicáveis (AcroForm, via pypdf: a fpdf2 2.9 só cria campo de assinatura) por cima do quadradinho desenhado, que sai na impressão; dica do Modo mercado no fim; o PDF nunca vai para o disco. As fontes padrão não têm emoji: as marcas são texto e o "≈" usa a fonte Symbol. Falta separar por mercado quando a compra for dividida (vem com o C15) |
+| C11 PDF | ✅ (24/11) | Cada item com "≈ estimado", "PROMOÇÃO (mercado, até dd/mm)" ou "preço pago" (Modo mercado); caixinhas clicáveis (AcroForm, via pypdf: a fpdf2 2.9 só cria campo de assinatura) por cima do quadradinho desenhado, que sai na impressão; dica do Modo mercado no fim; o PDF nunca vai para o disco. As fontes padrão não têm emoji: as marcas são texto e o "≈" usa a fonte Symbol. Compra dividida (C15): uma parte por mercado, com subtotal |
 | C12 Mercados próximos | ❌ | Não começado |
-| C13 Coletor | ❌ | Não começado. Fase 1 (pesquisa) **para e espera aprovação** |
-| C14 Promoções e avisos | ❌ quase tudo | Existem a tabela `promocoes` e o liga/desliga pela conversa. Faltam `/promo`, `/avisos`, avisos pelo JobQueue, resumo semanal e limpeza das vencidas |
-| C15 "Onde comprar" | ❌ | Não começado |
+| C13 Coletor | ✅ (24/11) | Redes escolhidas pelos critérios do dono: **Prezunic, Atacadão e Dia a Dia** (tabela em "C13: redes de Goiânia"). `coletor/` com um arquivo por rede (`coletar(nav)`), `web.py` (robots.txt, 1 requisição a cada 5 s por site, timeout, User-Agent "RendeColetor", até 18 MB, nada no disco), `extrair.py` (Gemini com JSON; a tarefa "coletor" **nunca** sobe para o Claude) e `promocoes.py` (normaliza "ARROZ TIO JOÃO 5KG" → arroz / Tio João / 5 kg, confere preço e validade, não repete). Hash sha256 + endereço de cada encarte em `encartes`: o mesmo não vai de novo para a IA. Encarte de bazar/eletro nem é baixado. Uma rede quebrada não derruba as outras e o admin recebe aviso. Coleta diária às 6h (`COLETOR_HORA`) pelo JobQueue e `/coletar` (admin). Rodar à mão: `python -m coletor` (`--listar` só lista, sem IA). Coleta real de 24/11: ver "C13: coleta real" |
+| C14 Promoções e avisos | ✅ (24/11) | `avisos.py` (sem Telegram): promoção nova avisa quem tem avisos ligados, cadastro pronto, mora na cidade e tem o produto na lista do plano, nos pratos favoritos ou nas preferências (sem contar "não gosto de..."), nunca de algo proibido pelas restrições; no máximo 1 aviso por dia, só das 8h às 21h e nunca no dia do resumo. Resumo semanal no dia/hora escolhidos (padrão sábado 9h) com a sobra do último plano 🎉, as promoções (as da lista primeiro) e [📅 Montar cardápio]. JobQueue a cada 15 min; limpeza das vencidas às 00h10 e depois de cada coleta. `/avisos` liga e desliga; `/promo mercado; produto; preço; dd/mm[; marca=...; condicao=...; cidade=...]` (admin) dispara os avisos na hora. Quem bloqueia o bot para de receber. O cardápio recebe até 40 promoções de **comida** que a pessoa pode comer, nos mercados dela, maior desconto primeiro, e as instruções pedem preferência a elas sem quebrar orçamento, restrições e variedade |
+| C15 "Onde comprar" | ✅ (24/11) | `onde_comprar.py`: total da lista em cada mercado (promoção que combina com o item, convertida para a quantidade que a lista precisa; senão o estimado), 3 melhores com medalha, % da lista com preço real, condições ("com clube", "só no app"...), divisão entre 2 mercados só se economizar R$ 15+. [📋 mercado] mostra cada item como "🔥 promoção (até dd/mm)" ou "≈ estimado"; [✅ Vou comprar no X] e [✂️ Dividir] guardam a escolha no plano: lista, PDF (separado por mercado) e Modo mercado passam a usar esses preços; [↩️ Desfazer]. A distância entra com o C12 |
 
 ## Ordem de trabalho (Pedido I, 24/11; substitui a PARTE D do Pedido H)
 
@@ -59,8 +59,8 @@ Sem parar entre os itens; resumo curto ao fim de cada C.
 5. ✅ C6 (entender qualquer mensagem) (24/11).
 6. ✅ C2 (escada de modelos) (24/11).
 7. ✅ C3 (escopo) (24/11).
-8. ⏳ **Próximo:** C13 Fases 1 e 2 (o Claude escolhe as redes pelos critérios do dono; não para).
-9. C14 → C15 → C12.
+8. ✅ C13 Fases 1 e 2 (24/11): redes escolhidas pelos critérios do dono, coletor e coleta real.
+9. ✅ C14 → ✅ C15 → ⏳ **Próximo:** C12.
 10. Relatório final (PARTE F) e roteiro do teste no celular (o dono testa depois de trocar as chaves).
 
 ## Custo do cardápio (Pedido I, 24/11/2026)
@@ -91,11 +91,42 @@ quais embalagens estão grandes demais. **Pendente:** uma nova rodada real (~US$
 o Sonnet passa de primeira; se não passar, as opções são effort "medium" (~US$ 0,10) ou deixar o
 próprio Sonnet corrigir o orçamento antes de chamar o Opus (decisão do dono).
 
+**Teste real do dono (24/11, 10h16, já com as correções):** orçamento de R$ 180. O Sonnet
+(US$ 0,046) montou R$ 258,80 e foi reprovado; o Opus refez dentro do orçamento (US$ 0,376, 17 mil
+tokens de saída). Cardápio: **US$ 0,42**. Com orçamento apertado, o Sonnet em "low" ainda erra
+a conta e o Opus sai caro: a decisão pendente acima ficou mais importante.
+
+## C13: redes de Goiânia (pesquisa de 24/11/2026)
+
+Critérios do dono: loja em Goiânia hoje; ofertas acessíveis sem login; robots.txt e termos de
+uso não proíbem a coleta. Acessos com User-Agent "RendePesquisa/1.0" e pausa entre acessos.
+
+| Rede | Loja em Goiânia | Onde ficam as ofertas | Varia por loja/região | robots.txt e termos | Observações | Decisão |
+|---|---|---|---|---|---|---|
+| **Prezunic** (Cencosud) | Sim (assumiu lojas do Bretas) | `/encartes`: PDFs com estado, início e fim num JSON da página | Sim: seletor RJ/GO (pegamos GO) | robots libera `/encartes` e os PDFs (`/arquivos`); termos não publicados em texto legível (a página carrega vazia) e nenhuma proibição achada | Muitas ofertas "com clube" (cadastro no clube) | ✅ coletada |
+| **Atacadão** (Carrefour) | Sim (Av. Independência) | Página da loja (`/loja/goiania-avenida-independencia`): folhetos em PDF com validade | Sim, por loja | robots libera `/loja/`; o servidor dos PDFs não tem robots; termos não proíbem coleta ("conteúdo do Atacadão, vedado o uso não autorizado": guardamos só produto e preço, com link, nunca o folheto) | Preço varejo e atacado (vai na condição) | ✅ coletada |
+| **Dia a Dia** (Atacadão Dia a Dia) | Sim (Setor Novo Horizonte e Balneário) | Site de ofertas por loja + API pública do WordPress com o PDF do tabloide | Sim, por loja | robots libera tudo para `*` (bloqueia só robôs de treino de IA); política de privacidade não proíbe | Campanhas diárias (ex.: "Dia da Limpeza") | ✅ coletada |
+| Assaí | Sim | Página `/ofertas` com encarte por loja, carregado de um JSON | Sim, por loja | robots libera `/ofertas`, mas o JSON é bloqueado por proteção anti-robô (Incapsula) | Contornar a proteção não é boa conduta | ❌ candidata a parceria |
+| Bretas | Lojas viraram Prezunic em 2026 | Só no app, ativando a oferta com CPF | — | — | Exige cadastro | ❌ candidata a parceria |
+| Carrefour (hiper) | Não confirmada | Página de ofertas das lojas: 404/403 (Akamai) | — | — | — | ❌ candidata a parceria |
+| Sam's Club | Sim | Loja online | Por CEP | Termos **proíbem** "mineração de dados de qualquer tipo" | Preço só para sócio | ❌ não coletar |
+| Pão de Açúcar | Não confirmada (imóvel da loja de Goiânia vendido em 2026; GPA em recuperação) | Loja online por CEP, sem encarte | Por CEP | robots não proíbe | — | ❌ candidata a parceria |
+| Tático | Sim (segundo agregadores) | Site oficial fora do ar/bloqueado (erro 409); encartes só em agregadores | — | — | — | ❌ candidata a parceria |
+| Barão (Super Barão) | Sim | App "Clube Barão" (cadastro); site com erro 520 | — | — | Exige cadastro | ❌ candidata a parceria |
+| Cerrado | Não confirmada | Loja online (app de página única), sem encarte público achado | — | robots libera tudo | — | ❌ candidata a parceria |
+
+**C13: coleta real (24/11/2026, 10h17–10h21):** 305 ofertas novas, nenhum erro. Prezunic 172
+(2 encartes), Atacadão 83 (4 folhetos), Dia a Dia 50 (3 tabloides; o de Bazar foi pulado).
+Exemplos: arroz 5 kg R$ 19,90 (Prezunic, com clube) e R$ 20,99 (Atacadão); feijão carioca 1 kg
+R$ 6,59; óleo de soja 900 ml R$ 5,98; café 500 g R$ 17,99 (Atacadão). Custo: US$ 0,19 em 17
+chamadas (o Gemini 3.5 Flash-Lite deu 503 em todas e o reserva 3.6 Flash leu os encartes).
+Nas próximas coletas só entram encartes novos (hash).
+
 ## Decisões do Pedido I (24/11/2026)
 
 - Executar os pendentes do H **sem esperar aprovação entre as etapas**; resumo curto ao fim de cada C.
-- **Push bloqueado** até o dono confirmar a troca das 3 chaves. Chamadas pagas ao Claude nos
-  testes reais: permitidas, avisando o custo estimado antes de cada rodada.
+- Push estava bloqueado até a troca das 3 chaves; **liberado em 24/11** (o dono trocou as chaves
+  e pediu para subir). Chamadas pagas ao Claude nos testes reais: avisar o custo estimado antes.
 - Lacuna 3 do C10: sem nenhum modelo dentro do orçamento, entregar o melhor plano avisando quanto
   passou, com os botões [Tirar lanches] [Aumentar para R$ X] [Pratos mais simples]; avisar já no
   cadastro se o orçamento estiver muito abaixo do sugerido.
@@ -148,9 +179,8 @@ próprio Sonnet corrigir o orçamento antes de chamar o Opus (decisão do dono).
 - **O que foi feito, com autorização do dono:** o commit com o `.env` foi retirado da história
   (rebase) e o GitHub foi atualizado com force push protegido. O `.env` local foi mantido e o
   `.gitignore` agora o ignora (junto com `*.db`, `__pycache__/` e `.venv/`).
-- **Pendente (só o dono pode fazer):** trocar as 3 chaves (BotFather `/revoke`, Google AI Studio,
-  Anthropic Console) e colar as novas só no `.env` local. O GitHub ainda guarda o commit antigo
-  por um tempo, acessível só por quem tem o código dele; a troca das chaves resolve de vez.
+- **Feito pelo dono em 24/11:** as 3 chaves foram trocadas e as novas estão só no `.env` local.
+  O GitHub ainda pode guardar o commit antigo por um tempo, mas as chaves dele não valem mais.
   Para apagar também essa cópia, é preciso pedir ao suporte do GitHub (opcional).
 - Depois da troca: apagar a cópia de segurança local feita antes da limpeza (tem as chaves antigas;
   fica no outro computador).
@@ -160,5 +190,6 @@ próprio Sonnet corrigir o orçamento antes de chamar o Opus (decisão do dono).
 
 ## Chaves no .env (o dono preenche; nunca vão para a conversa nem para o Git)
 
-TELEGRAM_BOT_TOKEN, GEMINI_API_KEY, ANTHROPIC_API_KEY: preenchidas, **mas precisam ser
-trocadas** (ver Segurança). COTACAO_DOLAR (opcional): vazia.
+TELEGRAM_BOT_TOKEN, GEMINI_API_KEY, ANTHROPIC_API_KEY: preenchidas com as chaves novas (24/11).
+COTACAO_DOLAR (opcional): vazia. Coletor (opcionais): COLETOR_HORA, COLETOR_MAX_ENCARTES,
+COLETOR_ATACADAO_LOJAS, COLETOR_DIAADIA_LOJAS (ver `.env.example`).

@@ -59,10 +59,19 @@ def linhas(plano: dict) -> list[dict]:
     return [l for l in plano["cesta"]["linhas"] if l["pacotes"] > 0]
 
 
+def escolha(plano: dict, linha: dict) -> dict | None:
+    """C15: onde a pessoa decidiu comprar o item ({"mercado", "custo", "promocao"}), se decidiu."""
+    return ((plano.get("onde_comprar") or {}).get("itens") or {}).get(cesta.chave(linha["item"]))
+
+
 def custo_linha(plano: dict, linha: dict) -> float:
-    """Custo da linha: preço informado pela pessoa (se houver) ou o estimado."""
+    """Custo da linha: preço informado pela pessoa (se houver), o do mercado escolhido no
+    "Onde comprar" (se houver) ou o estimado."""
     preco = (plano.get("mercado") or {}).get("precos", {}).get(cesta.chave(linha["item"]))
-    return round(linha["pacotes"] * preco, 2) if preco is not None else linha["custo"]
+    if preco is not None:
+        return round(linha["pacotes"] * preco, 2)
+    escolhido = escolha(plano, linha)
+    return escolhido["custo"] if escolhido else linha["custo"]
 
 
 def resumo(plano: dict) -> dict:

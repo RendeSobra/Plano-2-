@@ -9,16 +9,21 @@ Tudo devolve uma lista de telas.Saida, que o canal desenha.
 import asyncio
 import logging
 import os
+import re
 from collections import defaultdict
 
+import avisos
 import banco
 import cadastro
 import cardapio
 import escopo
 import ferramentas
 import mercado
+import onde_comprar
 import pdf
+import promocoes
 import prompts
+import restricoes
 import roteador
 import telas
 from cardapio import NOME_DIA, NOME_REFEICAO
@@ -129,6 +134,10 @@ async def acao(usuario: str, acao_txt: str) -> list[Saida]:
         return await _acao_plano(usuario, acao_txt)
     if acao_txt.startswith("mm:"):
         return _acao_mercado(usuario, acao_txt)
+    if acao_txt.startswith("oc:"):
+        return await _acao_onde_comprar(usuario, acao_txt)
+    if acao_txt.startswith("av:"):
+        return [avisos.acao(usuario, acao_txt)]
     if acao_txt == "pr:ver":
         cidade = banco.usuario(usuario).get("cidade") or "Goiânia"
         return [telas.promocoes(banco.promocoes_validas(cidade=cidade, limite=100), cidade, prompts.SEM_PROMOCOES)]
@@ -175,6 +184,56 @@ def _acao_mercado(usuario: str, acao_txt: str) -> list[Saida]:
                  len(plano["mercado"]["nao_encontrei"]))
         return [telas.compras_encerradas(plano, banco.usuario(usuario))]
     return [telas.modo_mercado(plano)]
+
+
+async def distancias_dos_mercados(perfil: dict) -> dict[str, float]:
+    """Rede -> distância (km) da loja mais perto, quando a pessoa mandou a localização (C12)."""
+    return {}
+
+
+async def _acao_onde_comprar(usuario: str, acao_txt: str) -> list[Saida]:
+    """C15: oc:ver (comparação), oc:m:<mercado> (itens), oc:e:<mercado> (vou comprar lá),
+    oc:div (dividir entre os 2 que mais economizam), oc:limpar (desfazer a escolha)."""
+    plano = banco.plano_atual(usuario)
+    if plano is None:
+        return [telas.tela(prompts.SEM_PLANO, [[Botao("✨ Montar agora", "pl:montar")]])]
+    perfil = banco.usuario(usuario)
+    mercados = onde_comprar.comparar(plano, perfil, await distancias_dos_mercados(perfil))
+    divisao = onde_comprar.melhor_divisao(mercados)
+    partes = acao_txt.split(":")
+    por_chave = {telas.chave_mercado(m.nome): m for m in mercados}
+
+    def salvar(nomes: list[str], escolha: dict[str, str]) -> None:
+        itens = {}
+        for m in mercados:
+            for item in m.itens:
+                if escolha.get(item.chave) == m.nome:
+                    itens[item.chave] = {"mercado": m.nome, "custo": item.custo, "promocao": item.promocao}
+        plano["onde_comprar"] = {"mercados": nomes, "itens": itens}
+        banco.atualizar_plano(plano["id"], {k: v for k, v in plano.items() if k not in ("id", "criado_em")})
+
+    if partes[1] == "m" and len(partes) > 2 and partes[2] in por_chave:
+        return [telas.onde_comprar_mercado(por_chave[partes[2]])]
+    if partes[1] == "e" and len(partes) > 2 and partes[2] in por_chave:
+        m = por_chave[partes[2]]
+        salvar([m.nome], {item.chave: m.nome for item in m.itens})
+        log.info("Onde comprar: um mercado escolhido.")
+        return [telas.texto(f"✅ Combinado: a lista e o PDF agora usam os preços do *{m.nome}* "
+                            f"({telas.brl(m.total)})."), telas.lista(plano, editar=False)]
+    if partes[1] == "div":
+        if divisao is None:
+            return [telas.onde_comprar(plano, mercados, None, bool(perfil.get("latitude")),
+                                       onde_comprar.condicoes(mercados))]
+        salvar(list(divisao.mercados), divisao.itens)
+        log.info("Onde comprar: compra dividida entre 2 mercados.")
+        return [telas.texto(f"✂️ Combinado: compra dividida entre *{divisao.mercados[0]}* e *{divisao.mercados[1]}* "
+                            f"(economia de {telas.brl(divisao.economia)}). O PDF separa a lista por mercado."),
+                telas.lista(plano, editar=False)]
+    if partes[1] == "limpar":
+        plano.pop("onde_comprar", None)
+        banco.atualizar_plano(plano["id"], {k: v for k, v in plano.items() if k not in ("id", "criado_em")})
+    return [telas.onde_comprar(plano, mercados, divisao, bool(perfil.get("latitude")),
+                               onde_comprar.condicoes(mercados))]
 
 
 def _resposta_de_preco(usuario: str, perfil: dict, texto: str) -> list[Saida] | None:
@@ -448,15 +507,67 @@ async def receber_localizacao(usuario: str, latitude: float, longitude: float) -
 
 
 # --- administração --------------------------------------------------------------------
+USO_PROMO = ("Para cadastrar uma promoção:\n"
+             "/promo mercado; produto; preço; validade\n"
+             "Ex.: /promo Assaí; arroz 5 kg; 21,90; 30/11\n"
+             "Opcional, no fim: ; marca=Tio João; condicao=leve 3 pague 2; cidade=Goiânia")
+
+
+def _data_promo(texto: str):
+    """'30/11' ou '30/11/2026' -> date (dd/mm sem ano: o ano atual)."""
+    from datetime import date
+    partes = [p for p in re.split(r"[/.-]", texto.strip()) if p]
+    try:
+        dia, mes = int(partes[0]), int(partes[1])
+        ano = int(partes[2]) if len(partes) > 2 else banco.agora().year
+        return date(ano + 2000 if ano < 100 else ano, mes, dia)
+    except (ValueError, IndexError):
+        return None
+
+
+def cadastrar_promocao(usuario: str, texto: str) -> tuple[list[Saida], bool]:
+    """/promo (só admin). Devolve as telas e se entrou alguma promoção nova (para disparar os avisos)."""
+    if not eh_admin(usuario):
+        return [telas.texto(prompts.SO_ADMIN)], False
+    partes = [p.strip() for p in (texto or "").split(";")]
+    if len(partes) < 4 or not all(partes[:4]):
+        return [telas.texto(USO_PROMO)], False
+    mercado_nome, produto, preco_txt, validade_txt = partes[:4]
+    extras = {}
+    for item in partes[4:]:
+        chave_extra, _, valor = item.partition("=")
+        extras[restricoes.normalizar(chave_extra)] = valor.strip()
+    validade = _data_promo(validade_txt)
+    if validade is None:
+        return [telas.texto(f"Não entendi a validade '{validade_txt}'. Use dd/mm, ex.: 30/11.\n\n{USO_PROMO}")], False
+    oferta = {"produto": produto, "tamanho": produto, "preco": preco_txt, "marca": extras.get("marca"),
+              "condicao": extras.get("condicao")}
+    r = promocoes.salvar_ofertas(mercado=mercado_nome, ofertas=[oferta], origem="admin",
+                                 cidade=extras.get("cidade") or None, validade=validade, maximo=1)
+    if r.get("erro"):
+        return [telas.texto(f"Não salvei: {r['erro']}.")], False
+    if not r["salvas"]:
+        return [telas.texto("Não salvei: preço inválido ou essa promoção já está cadastrada.")], False
+    p = banco.promocao(r["ids"][0])
+    descricao = " ".join(x for x in (p["produto"], p.get("marca"), p.get("tamanho")) if x)
+    return [telas.texto(f"✅ Promoção cadastrada: {descricao} por *{telas.brl(p['preco'])}* no {p['mercado']} "
+                        f"({p['cidade']}) até {telas.data_br(p['validade'])}. Os avisos saem na próxima rodada "
+                        f"(das {avisos.HORA_INICIO}h às {avisos.HORA_FIM}h).")], True
+
+
+def admins() -> list[str]:
+    return [i.strip() for i in (os.getenv("ADMIN_IDS") or "").split(",") if i.strip()]
+
+
 def eh_admin(usuario: str) -> bool:
-    return usuario in {i.strip() for i in (os.getenv("ADMIN_IDS") or "").split(",") if i.strip()}
+    return usuario in admins()
 
 
 NOMES_NIVEL = {"gemini": "Gemini", "gemini-reserva": "Gemini reserva", "haiku": "Haiku", "sonnet": "Sonnet",
                "opus": "Opus"}
 NOMES_TAREFA = {"conversa": "conversa", "midia": "áudio/foto", "cadastro": "cadastro", "receita": "receitas",
                 "cardapio": "gerar cardápio", "troca": "trocar prato", "complexo": "pedido complexo",
-                "encarte": "encartes"}
+                "encarte": "encartes", "coletor": "coletor de promoções"}
 
 
 def _mil(n: int | None) -> str:
