@@ -64,6 +64,8 @@ por texto, áudio e foto, e uma escada de modelos de IA que sobe de nível só q
    para o GitHub. Com autorização do dono, o commit foi retirado da história e o GitHub foi
    atualizado (force push protegido); o `.env` local foi mantido. **Pendente: o dono trocar as
    3 chaves.** Detalhes na seção "Segurança" do PLANO.md.
+9. **Teste real no celular (parcial) e 3 correções:** robô ligado neste computador, cadastro
+   novo com orçamento de R$ 140. Resultado e correções na seção 6 e 7.
 
 ## 3. Arquitetura (cada arquivo com um papel)
 
@@ -109,7 +111,7 @@ Tabelas: `usuarios`, `historico` (30 últimas), `planos` (3 últimos; o mais nov
 ## 5. Como rodar e testar
 
 Veja o [README](README.md). Testes automáticos: `.venv\Scripts\python testes\testar.py`
-(**101 de 101 OK** em 24/11/2026). Ajudantes do teste pelo celular em `testes/celular/`.
+(**109 de 109 OK** em 24/11/2026). Ajudantes do teste pelo celular em `testes/celular/`.
 
 ## 6. Resultado do teste real no celular (23/11/2026)
 
@@ -125,7 +127,27 @@ Veja o [README](README.md). Testes automáticos: `.venv\Scripts\python testes\te
 | PDF da lista (e sumindo sozinho) | ✅ | Sem IA |
 | `/custos` | ✅ total do teste **US$ 0,37** | n/a |
 
+**Teste real de 24/11/2026 (parcial, orçamento R$ 140):**
+
+| Etapa | Resultado | Quem fez / custo (tabela) |
+|---|---|---|
+| Cardápio | ✅, mas caro | Sonnet US$ 0,167 (bateu nos 16 mil tokens; JSON cortado) → Opus US$ 0,190 |
+| Conversa (12 mensagens) | ✅ | Gemini, ~US$ 0,001 cada |
+| Troca de prato | ❌ | Haiku (+R$ 1,00) → Sonnet (+R$ 14,50) → Opus (+R$ 1,50): todos acima do orçamento, US$ 0,06 |
+
+Gasto até a correção: cerca de US$ 0,43.
+
 ## 7. Defeitos achados nos testes reais (todos corrigidos)
+
+Em 24/11 (corrigidos no mesmo dia, com testes automáticos novos):
+
+- Cardápio cortado no limite de 16 mil tokens → limite de 32 mil com streaming.
+- Troca recebia uma folga "proporcional" maior que a real e não sabia das sobras das
+  embalagens → folga exata e lista de sobras; sem folga, avisa sem gastar; falha por
+  orçamento explica o motivo em vez de convidar a repetir.
+- O log gravava o ID da conta do Telegram → removido de todas as linhas.
+
+Em 23/11:
 
 - Soma da lista errada pela IA → total em código.
 - "Couve manteiga" barrada como lactose (falso alarme) → exceção; custou uma subida
@@ -147,10 +169,9 @@ A ordem agora é a da PARTE D do Pedido H (lista completa e situação de cada i
    **encarte** → extrair ofertas e salvar em `promocoes` com origem "usuario" (C6; a
    ferramenta `salvar_promocoes_de_encarte` ainda não existe). Revisar as exceções de
    alergia com casos reais e o PDF em celulares pequenos.
-2. **C2:** melhorar o Haiku nas trocas (nas 2 trocas reais ele estourou o orçamento e
-   precisou do Sonnet: passar a folga exata e as sobras para reaproveitar). Rever o custo
-   do cardápio (21 refeições geraram 12,4 mil tokens de saída no Sonnet, ~US$ 0,13).
-   `/custos` com escalonamentos também no mês.
+2. **C2:** a troca já recebe a folga exata e as sobras (24/11); conferir no próximo teste
+   real se o Haiku acerta de primeira. Rever o custo do cardápio (o Sonnet chegou a usar
+   16 mil tokens de saída; agora o limite é 32 mil). `/custos` com escalonamentos também no mês.
 3. **C3:** escopo conferido em código (`no_escopo`), com teste de 40 mensagens.
 4. **C13 Fase 1:** pesquisa das redes de Goiânia. **Parar e esperar aprovação.**
 5. **C13 Fase 2 + C14:** coletor das redes aprovadas; `/promo`, `/avisos`, avisos pelo

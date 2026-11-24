@@ -9,7 +9,7 @@ Bot: @cesta_cardapio_bot (nome de exibição passa de "Cesta" para "Rende").
 ([docs/PEDIDOS.md](docs/PEDIDOS.md)); onde ela discordar dos pedidos anteriores, vale ela.
 Histórico, testes reais e detalhes: [CONTEXTO.md](CONTEXTO.md).
 
-Testes automáticos: `.venv\Scripts\python testes\testar.py` (**101 de 101 OK em 24/11/2026**).
+Testes automáticos: `.venv\Scripts\python testes\testar.py` (**109 de 109 OK em 24/11/2026**).
 
 ## Pedidos e situação
 
@@ -30,7 +30,7 @@ Testes automáticos: `.venv\Scripts\python testes\testar.py` (**101 de 101 OK em
 | Item | Situação | O que falta |
 |---|---|---|
 | C1 Arquitetura | 🟡 | Só a pasta `coletor/` (vem no C13) |
-| C2 Escada de modelos | 🟢 quase | `/custos` mostra os escalonamentos só do dia (pedido: dia e mês). O Haiku usa effort "medium" na troca: conferir na documentação atual se é o certo |
+| C2 Escada de modelos | 🟢 quase | `/custos` mostra os escalonamentos só do dia (pedido: dia e mês). O Haiku usa effort "medium" na troca: conferir na documentação atual se é o certo. Feito em 24/11 (depois do teste real): limite de 32 mil tokens com streaming; a troca recebe a folga exata e as sobras das embalagens; conferir no próximo teste se ela passa de primeira |
 | C3 Escopo | ❌ | Hoje é só uma frase no prompt. Falta o campo `no_escopo` conferido em código, as mensagens fixas com botões, o log "fora_do_escopo" e o teste com 40 mensagens |
 | C4 Personalidade | ✅ | O resumo semanal depende do C14 |
 | C5 Memória | ✅ | Funciona com nomes diferentes do pedido: despensa é uma coluna de `usuarios` e os custos ficam em `uso_ia`. `/perfil` não edita cidade nem localização |
@@ -79,6 +79,13 @@ Testes automáticos: `.venv\Scripts\python testes\testar.py` (**101 de 101 OK em
 - Reprovação na conferência, recusa (stop_reason "refusal") ou erro → **sobe um nível**.
   Todos os níveis do Claude falharam → Gemini, com registro no log.
   O fallback no servidor da Anthropic **não** foi ativado (a escada é feita no nosso código).
+- **Limite de saída do Claude: 32 mil tokens, com streaming** (o pedido era 16 mil no cardápio).
+  Aprovado pelo dono em 24/11: no teste real o Sonnet gastou os 16 mil (o raciocínio conta no
+  limite), o cardápio saiu cortado e o Opus refez tudo. Só se paga o que o modelo usa.
+- **Troca de prato:** o modelo recebe a folga exata (lista recalculada sem o prato antigo) e as
+  sobras das embalagens já compradas. Se nem um prato de graça caberia, o robô avisa sem chamar
+  a IA. Se todos os níveis estourarem o orçamento, explica o motivo em vez de "tentar de novo".
+- **Log sem dados pessoais:** nenhuma linha do registro grava o ID da conta do Telegram (regra A3).
 - O Claude não ouve áudio: turnos com áudio ficam no Gemini.
 - Somas, embalagens, alergias e repetição de pratos são sempre conferidas em código, nunca só pela IA.
 - Receitas (passo a passo) são geradas pelo Gemini só quando a pessoa abre o prato, e guardadas no plano.
