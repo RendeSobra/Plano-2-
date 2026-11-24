@@ -26,7 +26,7 @@ Testes automáticos: `.venv\Scripts\python testes\testar.py` (**276 de 276 OK em
 | F | Escada de modelos: Gemini → Haiku → Sonnet → Opus, limites por modelo, cache, /custos | ✅ Feito e testado no celular (23/11) |
 | G | Mensagens de troca e PDF sem poluir o chat; contexto no GitHub | ✅ Feito |
 | H | Retomada com a especificação completa (PARTES A a F) | 🔧 PARTE A ✅ (24/11). Itens pendentes: ver Pedido I |
-| I | Executar os pendentes do H sem parar entre etapas + Modo mercado + PDF com caixinhas | 🔧 Custo do cardápio ✅ · C10 ✅ · C9, C11 e Modo mercado ✅ · C6 ✅ · C2 ✅ · C3 ✅ · C13 ✅ · C14 ✅ · C15 ✅ · C12 ✅ (24/11). Falta: teste no celular e relatório final |
+| I | Executar os pendentes do H sem parar entre etapas + Modo mercado + PDF com caixinhas | 🔧 Custo do cardápio ✅ · C10 ✅ · C9, C11 e Modo mercado ✅ · C6 ✅ · C2 ✅ · C3 ✅ · C13 ✅ · C14 ✅ · C15 ✅ · C12 ✅ · relatório ✅ (24/11). Falta: teste no celular (roteiro em docs/RELATORIO.md) |
 
 ## Pedido H: situação de cada item da PARTE C (conferido em 24/11/2026)
 
@@ -61,7 +61,7 @@ Sem parar entre os itens; resumo curto ao fim de cada C.
 7. ✅ C3 (escopo) (24/11).
 8. ✅ C13 Fases 1 e 2 (24/11): redes escolhidas pelos critérios do dono, coletor e coleta real.
 9. ✅ C14 → ✅ C15 → ✅ C12 (24/11).
-10. Relatório final (PARTE F) e roteiro do teste no celular (o dono testa depois de trocar as chaves).
+10. ✅ Relatório final (PARTE F) e roteiro do teste no celular: [docs/RELATORIO.md](docs/RELATORIO.md) (24/11).
 
 ## Custo do cardápio (Pedido I, 24/11/2026)
 
